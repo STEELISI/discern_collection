@@ -1,0 +1,10 @@
+#!/bin/bash
+
+echo "ending uploading experiment"
+
+# Incase it recycles commands between experiments
+ssh attacker "rm ~/byob/database.db" || true
+rm ~/byob/byob/database.db || true
+ssh attacker "rm ~/byob/output/*" || true
+
+

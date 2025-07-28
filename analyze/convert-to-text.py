@@ -12,7 +12,7 @@ proc_new_data_file = "proc-new-data.json"
 
 # Set up the influx connection
 url = "http://10.10.10.4:8086"
-token = ""
+token = "BIGElHSa291FOkrliGaBVc7ksnGgQ4vALbkfJzRuH02T2XB8qouH0H3IkYTJACE-XZ-QYV664CH5655LkbQDIQ"
 org = "ISI"
 bucket = "DISCERN"
 
@@ -115,9 +115,9 @@ with open(cpu_data_file, 'w') as fd:
 
 
 
-
-Write the interface data to file
-
+# 
+# Write the interface data to file
+# 
 
 query = f'''
 from(bucket: "DISCERN")

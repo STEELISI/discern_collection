@@ -51,54 +51,98 @@ The script will print its progress to the console, indicating which combination 
 ### Directory Structure
 
 The script expects the following directory structure:
+```
+<path_to_legitimate_data>/
+└── <legit_activity>/                      <- This is parent_folder1
+    ├── <legit_machine_1-data>/
+    │   ├── cpu-load-data.txt
+    │   ├── network-data.txt
+    │   ├── proc-cpu-data.txt              <- Must exist
+    │   └── ... (other common data files)
+    └── <legit_machine_2-data>/
+        ├── cpu-load-data.txt
+        ├── network-data.txt
+        ├── proc-cpu-data.txt              <- Must exist
+        └── ... (other common data files)
 
-parent_folder1/
-├── subfolder1-data/
-│   ├── cpu-load-data.txt
-│   ├── network-data.txt
-    ├── file-data.txt
-    ├── logs-data.txt
-    ├── proc-cpu-data.txt
-    ├── proc-new-data.txt
-    └── proc-mem-data.txt
-└── subfolder2-data/
-    ├── cpu-load-data.txt
-    ├── network-data.txt
-    ├── file-data.txt
-    ├── logs-data.txt
-    ├── proc-cpu-data.txt
-    ├── proc-new-data.txt
-    └── proc-mem-data.txt
+<path_to_malicious_data>/
+└── <mal_activity>/                        <- This is parent_folder2
+    ├── <mal_machine_X-data>/
+    │   ├── cpu-load-data.txt
+    │   ├── network-data.txt
+    │   ├── proc-cpu-data.txt              <- Must exist
+    │   └── ... (other common data files)
+    └── <mal_machine_Y-data>/
+        ├── cpu-load-data.txt
+        ├── network-data.txt
+        ├── proc-cpu-data.txt              <- Must exist
+        └── ... (other common data files)
 
-parent_folder2/
-├── subfolderA-data/
-    ├── cpu-load-data.txt
-    ├── network-data.txt
-    ├── file-data.txt
-    ├── logs-data.txt
-    ├── proc-cpu-data.txt
-    ├── proc-new-data.txt
-    └── proc-mem-data.txt
-└── subfolderB-data/
-    ├── cpu-load-data.txt
-    ├── network-data.txt
-    ├── file-data.txt
-    ├── logs-data.txt
-    ├── proc-cpu-data.txt
-    ├── proc-new-data.txt
-    └── proc-mem-data.txt
+```
 
 
-It will then process all combinations (`subfolder1` + `subfolderA`, `subfolder1` + `subfolderB`, etc.) and place the results in the `base_output_folder`.
+## Expected output format
+
+```
+<base_output_folder>/
+└── <legit_activity>_<mal_activity>/
+    └── <run_number>/
+        ├── <legit_machine_1>_<mal_machine_A>/
+        │   ├── cpu-load-data.txt
+        │   ├── file-data.txt
+        │   ├── network-data.txt
+        │   ├── proc-cpu-data.txt
+        │   ├── proc-mem-data.txt
+        │   ├── proc-new-data.txt
+        │   └── malicious_time.txt
+        ├── <legit_machine_1>_<mal_machine_B>/
+        │   ├── cpu-load-data.txt
+        │   ├── file-data.txt
+        │   ├── network-data.txt
+        │   ├── proc-cpu-data.txt
+        │   ├── proc-mem-data.txt
+        │   ├── proc-new-data.txt
+        │   └── malicious_time.txt
+        ├── <legit_machine_2>_<mal_machine_A>/
+        │   ├── cpu-load-data.txt
+        │   ├── file-data.txt
+        │   ├── network-data.txt
+        │   ├── proc-cpu-data.txt
+        │   ├── proc-mem-data.txt
+        │   ├── proc-new-data.txt
+        │   └── malicious_time.txt
+        └── <legit_machine_2>_<mal_machine_B>/
+            ├── cpu-load-data.txt
+            ├── file-data.txt
+            ├── network-data.txt
+            ├── proc-cpu-data.txt
+            ├── proc-mem-data.txt
+            ├── proc-new-data.txt
+            └── malicious_time.txt
+```
 
 ### Timestamp Synchronization
 
-The core of the merging logic is timestamp synchronization. To align the data from `file2` with `file1`, the script:
-1.  Finds the earliest timestamp ($T_{base}$) in `file1`. This serves as the baseline for the new, unified timeline.
-2.  Finds the earliest timestamp ($T_{local\_min}$) in `file2`.
-3.  For each subsequent timestamp ($T_{current}$) in `file2`, it calculates the new timestamp ($T_{new}$) as:
-    $$T_{new} = (T_{current} - T_{local\_min}) + T_{base} + \text{offset}$$
-This ensures that the relative timing of events within `file2` is preserved, but the entire sequence is shifted to start relative to `file1`.
+The core of the merging logic is timestamp synchronization. To align the data from `node2` with `node1`, the script:
+1.  Finds the earliest timestamp ($T_{n1\_start}$) in a node in `exp1`. This serves as the baseline for the new, unified timeline, the earliest timestamp is determined by `proc-cpu-data.txt`.
+2.  Finds the earliest timestamp ($T_{n2\_start}$) in a node in `exp2`.
+3.  A random generated number ($R$) is used for later malicious start time calculation, $R$ is smaller than the difference in timespan for `exp1` and `exp2`; the merge only runs when `exp1` has a longer timespan.
+
+    $$1<=R <=T_{1span} - T_{2span}$$
+
+4.  A malicious start time is calculated based of one of the nodes from `exp1`. The earliest timestamp ($T_{s1\_start}$)
+
+    $$T_{malicious\_start} = T_{s1\_start} + R$$
+
+5.  For each subsequent timestamp ($T_{current}$) in the node from `exp2`, it calculates the new timestamp ($T_{new}$) as:
+
+    $$T_{new} = T_{current} -T_{n2\_start} + T_{n1\_start} + (T_{malicious\_start} - T_{n1\_start}) $$
+    $$T_{new} = T_{current} -T_{n2\_start} +T_{malicious\_start}$$
+
+Notice that $T_{s1\_start}$ does not neccessarily equal to $T_{n1\_start}$.
+
+This ensures that the relative timing of events between different nodes is preserved, as if the `exp2` starts running at $T_{malicious\_start}$.
+
 
 ### Data Processing Logic
 

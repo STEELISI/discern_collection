@@ -2,6 +2,7 @@ import os
 import json
 import pandas as pd
 import itertools
+import random
 
 def generate_unified_dev_id(file1_path, file2_path, default_id="unified.dev.id"):
     """
@@ -93,7 +94,58 @@ def find_earliest_timestamp(filepath):
     
     return float('inf')
 
-def process_network_data(file1_path, file2_path,time_offset_file1, time_offset_file2):
+def get_timespan_from_file(filepath):
+    """
+    Calculates the timespan (last_timestamp - first_timestamp) for a data file.
+    
+    Reads the first and last valid lines to get timestamps.
+    
+    Args:
+        filepath (str): The path to the data file.
+
+    Returns:
+        tuple: (first_ts, last_ts, timespan) or None if file is invalid.
+    """
+    first_ts, last_ts = None, None
+    try:
+        with open(filepath, 'r') as f:
+            # Find the first valid line for the first timestamp
+            for line in f:
+                if line.strip():
+                    first_ts = int(json.loads(line)['TimeStamp'])
+                    break
+            
+            if first_ts is None: # File is empty or contains only empty lines
+                return None
+
+            # Efficiently find the last line by reading the end of the file
+            f.seek(0, os.SEEK_END)
+            # Handle files smaller than the buffer
+            buffer_size = min(8192, f.tell())
+            f.seek(f.tell() - buffer_size, os.SEEK_SET)
+            buffer = f.read(buffer_size)
+            
+            # Find the last non-empty line in the buffer
+            lines = buffer.strip().split('\n')
+            if lines and lines[-1]:
+                 last_ts = int(json.loads(lines[-1])['TimeStamp'])
+            else: # Fallback for very small files
+                f.seek(0)
+                all_lines = [l for l in f.readlines() if l.strip()]
+                if all_lines:
+                    last_ts = int(json.loads(all_lines[-1])['TimeStamp'])
+
+        if first_ts is not None and last_ts is not None:
+            return first_ts, last_ts, last_ts - first_ts
+            
+    except (FileNotFoundError, json.JSONDecodeError, KeyError, IndexError):
+        # Handle cases where file doesn't exist, is malformed, or empty
+        print(f"Warning: Could not read or parse timestamps from {filepath}")
+        return None
+    
+    return None
+
+def process_network_data(file1_path, file2_path,s1_start,s2_start,time_offset_file1, time_offset_file2):
     """
     A separate, isolated pipeline for processing network-data.txt to preserve
     the accuracy of nested timestamps.
@@ -124,34 +176,32 @@ def process_network_data(file1_path, file2_path,time_offset_file1, time_offset_f
     except FileNotFoundError:
         print(f"Warning: File not found: {file1_path}")
 
-    if local_min == float('inf'):
-        print(f"Info: No data to process from {file2_path}")
-    else:
-        try:
-            with open(file2_path, 'r') as f:
-                for line in f:
-                    if not line.strip(): continue
-                    try:
-                        data = json.loads(line)
-                        
-                        data["TimeStamp"] = str(int(data["TimeStamp"]) - local_min + min_timestamp + time_offset_file2)
-                        
-                        if "Packets" in data and isinstance(data["Packets"], list):
-                            for i, packet in enumerate(data["Packets"]):
-                                data["Packets"][i]["TimeStamp"] = str(int(data["Packets"][i]["TimeStamp"]) - local_min + min_timestamp + time_offset_file2)
-                        all_data.append(data)
-                    except (json.JSONDecodeError, KeyError):
-                        print(f"Warning: Could not process line in {file2_path}: {line.strip()}")
-        except FileNotFoundError:
-            print(f"Warning: File not found: {file2_path}")
+    
+    try:
+        with open(file2_path, 'r') as f:
+            for line in f:
+                if not line.strip(): continue
+                try:
+                    data = json.loads(line)
+                    
+                    data["TimeStamp"] = str(int(data["TimeStamp"]) - s2_start + s1_start + time_offset_file2)
+                    
+                    if "Packets" in data and isinstance(data["Packets"], list):
+                        for i, packet in enumerate(data["Packets"]):
+                            data["Packets"][i]["TimeStamp"] = str(int(data["Packets"][i]["TimeStamp"]) - s2_start + s1_start + time_offset_file2)
+                    all_data.append(data)
+                except (json.JSONDecodeError, KeyError):
+                    print(f"Warning: Could not process line in {file2_path}: {line.strip()}")
+    except FileNotFoundError:
+        print(f"Warning: File not found: {file2_path}")
             
     return all_data
 
-def process_file_data(file1_path,file2_path,time_offset_file1, time_offset_file2):
+def process_file_data(file1_path,file2_path,s1_start,s2_start, time_offset_file1, time_offset_file2):
     all_data = []
     min_timestamp = find_earliest_timestamp(file1_path)
-    if(min_timestamp == float('inf')):
-        min_timestamp = find_earliest_timestamp(file2_path)
+    # if(min_timestamp == float('inf')):
+    #     min_timestamp = find_earliest_timestamp(file2_path)
     local_min = find_earliest_timestamp(file2_path)
     unified_dev_id = generate_unified_dev_id(file1_path, file2_path)
     try:
@@ -161,8 +211,8 @@ def process_file_data(file1_path,file2_path,time_offset_file1, time_offset_file2
                 try:
                     data = json.loads(line)
                     
-                    if data["TimeStamp"] != str(min_timestamp):
-                        data["TimeStamp"] = str(int(data["TimeStamp"]) + time_offset_file1)
+                    
+                    data["TimeStamp"] = str(int(data["TimeStamp"]) + time_offset_file1)
                     
                     if "DevID" in data:
                         data["DevID"] = unified_dev_id
@@ -193,10 +243,10 @@ def process_file_data(file1_path,file2_path,time_offset_file1, time_offset_file2
                 try:
                     data = json.loads(line)
                     if data["TimeStamp"] == str(local_min):
-                        # not offseting the initial commit
-                        data["TimeStamp"] = str(int(data["TimeStamp"]) - local_min + min_timestamp)
+                        # set file initialization to the same as the file1
+                        data["TimeStamp"] = str(min_timestamp +time_offset_file1)
                     else:
-                        data["TimeStamp"] = str(int(data["TimeStamp"]) - local_min + min_timestamp + time_offset_file2)
+                        data["TimeStamp"] = str(int(data["TimeStamp"]) - s2_start + s1_start + time_offset_file2)
                         if "DevID" in data:
                             data["DevID"] = unified_dev_id
                         all_data.append(data)
@@ -207,7 +257,7 @@ def process_file_data(file1_path,file2_path,time_offset_file1, time_offset_file2
         
     return all_data
 
-def process_and_combine_data(folder1, folder2, output_folder,time_offset_file1, time_offset_file2):
+def process_and_combine_data(folder1, folder2, output_folder,s1_start, s2_start, time_offset_file1, time_offset_file2):
     """
     Main processing function that merges files using your original timestamp logic
     and then calls fine-tuning functions as needed.
@@ -227,18 +277,16 @@ def process_and_combine_data(folder1, folder2, output_folder,time_offset_file1, 
         output_file_path = os.path.join(output_folder, filename)
 
         all_data = []
-        min_timestamp = float('inf')
 
         # seperated processing for network and file data
         if filename == "network-data.txt":
-            all_data = process_network_data(file1_path, file2_path,time_offset_file1, time_offset_file2)
+            all_data = process_network_data(file1_path, file2_path,s1_start,s2_start,time_offset_file1, time_offset_file2)
             
         elif filename == "file-data.txt":
-            all_data = process_file_data(file1_path,file2_path, time_offset_file1, time_offset_file2)
+            all_data = process_file_data(file1_path,file2_path, s1_start,s2_start,time_offset_file1, time_offset_file2)
             
             
         else:
-            # bug found: if file1 is skipped, file2 does not obtain the propper min_timestamp
             unified_dev_id = generate_unified_dev_id(file1_path, file2_path)
             try:
                 with open(file1_path, 'r') as f:
@@ -246,8 +294,6 @@ def process_and_combine_data(folder1, folder2, output_folder,time_offset_file1, 
                         if not line.strip(): continue
                         try:
                             data = json.loads(line)
-                            if(min_timestamp==float('inf')):
-                                min_timestamp = int(data["TimeStamp"])
                             
                             data["TimeStamp"] = str(int(data["TimeStamp"]) + time_offset_file1)
                             if "DevID" in data:
@@ -261,25 +307,11 @@ def process_and_combine_data(folder1, folder2, output_folder,time_offset_file1, 
 
             try:
                 with open(file2_path, 'r') as f:
-                    first_line = f.readline()
-                    if(min_timestamp==float('inf')):
-                        min_timestamp = int(first_line["TimeStamp"])
-                    if not first_line.strip():
-                        local_min = 0 
-                        f.seek(0)
-                    else:
-                        try:
-                            local_min = int(json.loads(first_line)["TimeStamp"])
-                        except (json.JSONDecodeError, KeyError):
-                            print(f"Warning: Could not get local_min from first line of {file2_path}. Using 0.")
-                            local_min = 0
-                            f.seek(0)
-
                     for line in f:
                         if not line.strip(): continue
                         try:
                             data = json.loads(line)
-                            data["TimeStamp"] = str(int(data["TimeStamp"]) - local_min + min_timestamp + time_offset_file2)
+                            data["TimeStamp"] = str(int(data["TimeStamp"]) - s2_start + s1_start + time_offset_file2)
                             if "DevID" in data:
                                 data["DevID"] = unified_dev_id
                             all_data.append(data)
@@ -319,67 +351,180 @@ def process_and_combine_data(folder1, folder2, output_folder,time_offset_file1, 
 # process_and_combine_data(source_folder1, source_folder2, output_folder_path)
 def main():
     """
-    Main execution function to find subfolders, generate permutations,
-    and process them automatically.
+    Main execution function that finds the tightest possible processing scenario
+    to ensure all valid combinations can be processed without being skipped.
     """
     # --- Configuration ---
-    parent_folder1 = '../../DISCERN/data/legitimate/synflood/0/'
-    parent_folder2 = '../../DISCERN/data/malicious/internetscanner/0/'
+    parent_folder1 = '../../DISCERN/data/legitimate/gpt/0/'
+    parent_folder2 = '../../DISCERN/data/malicious/upload/0/'
     base_output_folder = '../../DISCERN/data/merged/'
-    
-    # Optional time offsets
     time_offset_file1 = 0
-    time_offset_file2 = 0
 
     # --- Automatic Path and Folder Generation ---
     try:
-        # Extract descriptive names like 'dnsmitm' and 'upload' from the paths
         name1 = os.path.basename(os.path.dirname(os.path.abspath(parent_folder1)))
         name2 = os.path.basename(os.path.dirname(os.path.abspath(parent_folder2)))
-        # Extract common directory name, e.g., '0'
         common_dir = os.path.basename(os.path.abspath(parent_folder1))
     except Exception as e:
-        print(f"Could not automatically determine names from paths. Using placeholders. Error: {e}")
+        print(f"Could not automatically determine names from paths. Error: {e}")
         name1, name2, common_dir = "group1", "group2", ""
 
-    # Construct the specific output directory, e.g., ../../DISCERN/data/merged/dnsmitm_upload/0/
     specific_output_base = os.path.join(base_output_folder, f"{name1}_{name2}", common_dir)
 
     try:
         subfolders1 = [d for d in os.listdir(parent_folder1) if os.path.isdir(os.path.join(parent_folder1, d)) and d != "summary"]
         subfolders2 = [d for d in os.listdir(parent_folder2) if os.path.isdir(os.path.join(parent_folder2, d)) and d != "summary"]
     except FileNotFoundError as e:
-        print(f"Error: Could not find one of the parent directories. Please check paths. {e}")
+        print(f"Error: Could not find one of the parent directories. {e}")
         return
 
     if not subfolders1 or not subfolders2:
         print("Warning: One or both parent directories are empty or do not exist.")
         return
 
-    # Generate all combinations (Cartesian product) of the subfolders
-    folder_permutations = list(itertools.product(subfolders1, subfolders2))
+    # --- Pre-processing: Find the tightest-case scenario ---
+    print("--- Pre-processing: Finding the tightest scenario (shortest S1, longest S2) ---")
     
-    print(f"Found {len(subfolders1)} subfolders in {parent_folder1}: {subfolders1}")
-    print(f"Found {len(subfolders2)} subfolders in {parent_folder2}: {subfolders2}")
+    # 1. Find the SHORTEST timespan across ALL source 1 files
+    min_s1_span = float('inf')
+    for subfolder in subfolders1:
+        s1_proc_file_path = os.path.join(parent_folder1, subfolder, "proc-cpu-data.txt")
+        timespan_info = get_timespan_from_file(s1_proc_file_path)
+        if timespan_info and timespan_info[2] < min_s1_span:
+            min_s1_span = timespan_info[2]
+
+    # 2. Find the LONGEST timespan across ALL source 2 files
+    max_s2_span = 0
+    for subfolder in subfolders2:
+        s2_proc_file_path = os.path.join(parent_folder2, subfolder, "proc-cpu-data.txt")
+        timespan_info = get_timespan_from_file(s2_proc_file_path)
+        if timespan_info and timespan_info[2] > max_s2_span:
+            max_s2_span = timespan_info[2]
+
+    if min_s1_span == float('inf') or max_s2_span == 0:
+        print("[FATAL] Could not determine baseline timespans. Exiting.")
+        return
+
+    # 3. Check if the tightest case is even possible
+    if min_s1_span < max_s2_span:
+        print(f"[FATAL] The shortest legitimate file (span {min_s1_span}) cannot fit the longest malicious file (span {max_s2_span}). Cannot guarantee all combinations are possible.")
+        return
+        
+    print(f"Shortest S1 Span: {min_s1_span}, Longest S2 Span: {max_s2_span}\n")
+
+    # Generate a single random proportion based on this tightest-case
+    random_proportion = random.uniform(0.0, 1.0)
+    print(f"Using a single random proportion for all combinations: {random_proportion:.4f}\n")
+
+    folder_permutations = list(itertools.product(subfolders1, subfolders2))
     print(f"Generated {len(folder_permutations)} total combinations to process.\n")
 
+    
+    max_offset = min_s1_span - max_s2_span
+        
+    if max_offset < 1:
+        # This case happens if s1_span == s2_span, no room for an offset
+        time_offset_file2 = 0 # No offset possible, just align starts
+    else:
+        # Apply the single random proportion to the current pair's available gap.
+        # This guarantees a valid, scaled offset without skipping.
+        time_offset_file2 = int(max_offset * random_proportion)
+        time_offset_file2 = max(1, time_offset_file2)
+        
+        
     # --- Execution Loop ---
+    absolute_s1 = 0
     for i, (subfolder1, subfolder2) in enumerate(folder_permutations):
-        print(f"===== Starting Combination {i+1}/{len(folder_permutations)}: {subfolder1} + {subfolder2} =====")
         
-        source_path1 = os.path.join(parent_folder1, subfolder1)
-        source_path2 = os.path.join(parent_folder2, subfolder2)
         
-        # Construct the final output folder path, e.g., ../../merged/dnsmitm_upload/0/cache_victim2/
-        output_path = os.path.join(specific_output_base, f"{subfolder1[:-5]}_{subfolder2[:-5]}")
-        
-        print(f"  Source 1: {source_path1}")
-        print(f"  Source 2: {source_path2}")
-        print(f"  Output:   {output_path}\n")
+        if i ==0:
+            print(f"===== Starting Combination {i+1}/{len(folder_permutations)}: {subfolder1} + {subfolder2} =====")
+            
+            source_path1 = os.path.join(parent_folder1, subfolder1)
+            source_path2 = os.path.join(parent_folder2, subfolder2)
+            
+            rep_file = "proc-cpu-data.txt"
+            timespan_info1 = get_timespan_from_file(os.path.join(source_path1, rep_file))
+            timespan_info2 = get_timespan_from_file(os.path.join(source_path2, rep_file))
 
-        # Call the main processing function with the generated paths and offsets
-        process_and_combine_data(source_path1, source_path2, output_path, time_offset_file1, time_offset_file2)
-        
-        print(f"===== Finished Combination: {subfolder1} + {subfolder2} =====\n")
+            if not timespan_info1 or not timespan_info2:
+                print(f"  [STOP] Could not determine timespan for this pair. Skipping.")
+                continue
+
+            s1_start, _, s1_span = timespan_info1
+            s2_start, _, s2_span = timespan_info2
+
+            # DETECTOR: The only reason to skip is if this S2 fundamentally cannot fit in this S1
+            if s1_span < s2_span:
+                print(f"  [STOP] Source 1 span ({s1_span}) is too short for this Source 2 file ({s2_span}). Skipping.")
+                continue
+                
+            # CALCULATION: The available gap is the current S1 span minus the current S2 span.
+            
+            print(f"  Generated scaled random offset for Source 2: {time_offset_file2}")
+            output_path = os.path.join(specific_output_base, f"{subfolder1[:-5]}_{subfolder2[:-5]}")
+            absolute_s1 = s1_start+time_offset_file2
+            process_and_combine_data(source_path1, source_path2, output_path, s1_start, s2_start, time_offset_file1, time_offset_file2)
+            
+            malicious_start_time = s1_start + time_offset_file2
+            malicious_end_time = s1_start + time_offset_file2 + s2_span
+            
+            malicious_time_data = {
+                "malicious_start_time": malicious_start_time,
+                "malicious_end_time": malicious_end_time
+            }
+            
+            malicious_time_filepath = os.path.join(output_path, "malicious_time.txt")
+            with open(malicious_time_filepath, 'w') as f:
+                json.dump(malicious_time_data, f, indent=4)
+            
+            print(f"  Successfully wrote malicious time info to {malicious_time_filepath}")
+            print(f"===== Finished Combination: {subfolder1} + {subfolder2} =====\n")
+            
+            
+        else:
+            print(f"===== Starting Combination {i+1}/{len(folder_permutations)}: {subfolder1} + {subfolder2} =====")
+            
+            source_path1 = os.path.join(parent_folder1, subfolder1)
+            source_path2 = os.path.join(parent_folder2, subfolder2)
+            
+            rep_file = "proc-cpu-data.txt"
+            timespan_info1 = get_timespan_from_file(os.path.join(source_path1, rep_file))
+            timespan_info2 = get_timespan_from_file(os.path.join(source_path2, rep_file))
+
+            if not timespan_info1 or not timespan_info2:
+                print(f"  [STOP] Could not determine timespan for this pair. Skipping.")
+                continue
+
+            s1_start, _, s1_span = timespan_info1
+            s2_start, _, s2_span = timespan_info2
+
+            # DETECTOR: The only reason to skip is if this S2 fundamentally cannot fit in this S1
+            if s1_span < s2_span:
+                print(f"  [STOP] Source 1 span ({s1_span}) is too short for this Source 2 file ({s2_span}). Skipping.")
+                continue
+                
+            # CALCULATION: The available gap is the current S1 span minus the current S2 span.
+            time_offset_file2 = absolute_s1 - s1_start
+            print(f"  Calculating time offset for Source 2: {time_offset_file2}")
+            output_path = os.path.join(specific_output_base, f"{subfolder1[:-5]}_{subfolder2[:-5]}")
+
+            process_and_combine_data(source_path1, source_path2, output_path, s1_start, s2_start, time_offset_file1, time_offset_file2)
+            
+            malicious_start_time = s1_start + time_offset_file2
+            malicious_end_time = s1_start + time_offset_file2 + s2_span
+            
+            malicious_time_data = {
+                "malicious_start_time": malicious_start_time,
+                "malicious_end_time": malicious_end_time
+            }
+            
+            malicious_time_filepath = os.path.join(output_path, "malicious_time.txt")
+            with open(malicious_time_filepath, 'w') as f:
+                json.dump(malicious_time_data, f, indent=4)
+            
+            print(f"  Successfully wrote malicious time info to {malicious_time_filepath}")
+            print(f"===== Finished Combination: {subfolder1} + {subfolder2} =====\n")
+            
 if __name__ == "__main__":
     main()

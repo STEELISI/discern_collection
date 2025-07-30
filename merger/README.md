@@ -1,6 +1,6 @@
 # Log Data Fusion & Processing Script
 
-This script automates the process of merging and processing log files from two separate data source directories. It combines their corresponding log files, synchronizes timestamps, and applies specialized data processing rules to create a unified dataset.
+This script automates the process of merging and processing log files from two separate data source directories. It combines their corresponding log files, synchronizes timestamps, and applies specialized data processing rules to create a unified dataset. This program intends to merge data collected by two different nodes as if they are from the one node.
 
 ## Features
 
@@ -8,12 +8,12 @@ This script automates the process of merging and processing log files from two s
 * **Timestamp Synchronization**: Aligns the timestamps from the second data source to the timeline of the first, creating a unified chronological sequence.
 * **Unified Device ID**: Merges the `DevID` from both sources into a single, combined identifier (e.g., `a.b.c` and `a.d.c` become `a.b-d.c`).
 * **Specialized Data Handling**:
-    * **CPU Data (`cpu-load-data.txt`)**: Uses `pandas` to intelligently merge entries with the same timestamp by summing their CPU core loads.
+    * **CPU Data (`cpu-load-data.txt`)**: Merge entries with the same timestamp by summing their CPU core loads.
     * **Network Data (`network-data.txt`)**: Employs a dedicated pipeline to correctly process files with nested timestamps, preserving their internal accuracy.
-* **Structured Output**: Generates a clean, organized output directory structure that mirrors the combination of the source folders.
 
 
-## 🚀 Usage
+
+## Usage
 
 To use the script, you need to configure the source and output paths directly within the `main()` function in the script file.
 
@@ -24,17 +24,13 @@ To use the script, you need to configure the source and output paths directly wi
     ```python
     # --- Configuration ---
     # Path to the first parent directory containing data subfolders
-    parent_folder1 = '../../DISCERN/data/legitimate/synflood/0/'
+    parent_folder1 = '../../DISCERN-dev/data/legitimate/synflood/0/'
 
     # Path to the second parent directory containing data subfolders
-    parent_folder2 = '../../DISCERN/data/malicious/internetscanner/0/'
+    parent_folder2 = '../../DISCERN-dev/data/malicious/internetscanner/0/'
 
     # The base directory where all merged output will be saved
-    base_output_folder = '../../DISCERN/data/merged/'
-
-    # Optional: Apply a global time offset (delay) in seconds to all timestamps in a file
-    time_offset_file1 = 0
-    time_offset_file2 = 0
+    base_output_folder = '../../DISCERN-dev/data/merged/'
     ```
 
 3.  **Run the script** from your terminal:
@@ -46,7 +42,7 @@ The script will print its progress to the console, indicating which combination 
 
 ---
 
-## 🧠 How It Works
+## How It Works
 
 ### Directory Structure
 
@@ -147,5 +143,5 @@ This ensures that the relative timing of events between different nodes is prese
 ### Data Processing Logic
 
 * **Generic Files**: For most files, the script reads each line (which is a JSON object), applies the timestamp synchronization, unifies the `DevID`, and appends the result to a list.
-* **CPU Load Data**: After initial merging, this data is loaded into a `pandas` DataFrame. It's grouped by `TimeStamp`, and all CPU `Load` arrays for a given timestamp are summed element-wise. This handles cases where two records have the same timestamp by combining their core loads.
-* **Network Data**: This file is processed in an isolated function because it contains nested timestamps within a `"Packets"` array. The processing logic ensures that both the primary `TimeStamp` and all nested timestamps are correctly synchronized.
+* **CPU Load Data**: CPU loads are grouped by `TimeStamp`, and all CPU `Load` arrays for a given timestamp are summed element-wise. Given that in single experiments there could be CPU loads greater than 100 (multi-threaded programs), we are not capping the CPU load to maximum 100. This handles cases where two records have the same timestamp by combining their core loads.
+* **Network Data**: This file is processed in an isolated function because it contains nested timestamps within a `"Packets"` array. The processing logic ensures that both the primary `TimeStamp` and all nested timestamps are correctly synchronized. The IP are untouched any may require further manipulation to anonymize.

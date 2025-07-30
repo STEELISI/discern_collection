@@ -357,8 +357,8 @@ def main():
     to ensure all valid combinations can be processed without being skipped.
     """
     # --- Configuration ---
-    parent_folder1 = '../../DISCERN-dev/data/legitimate/gpt/0/'
-    parent_folder2 = '../../DISCERN-dev/data/malicious/upload/0/'
+    parent_folder1 = '../../DISCERN-dev/data/legitimate/synflood/0/'
+    parent_folder2 = '../../DISCERN-dev/data/malicious/internetscanner/0/'
     base_output_folder = '../../DISCERN-dev/data/merged/'
     time_offset_file1 = 0
 

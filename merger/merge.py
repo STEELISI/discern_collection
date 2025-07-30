@@ -152,7 +152,7 @@ def process_network_data(file1_path, file2_path,s1_start,s2_start,time_offset_fi
     """
     print("Running isolated processing for network-data.txt...")
     all_data = []
-
+    unified_dev_id = generate_unified_dev_id(file1_path, file2_path)
     min_timestamp = find_earliest_timestamp(file1_path)
     local_min = find_earliest_timestamp(file2_path)
     
@@ -167,6 +167,8 @@ def process_network_data(file1_path, file2_path,s1_start,s2_start,time_offset_fi
                  try:
                     data = json.loads(line)
                     data["TimeStamp"] = str(int(data["TimeStamp"]) + time_offset_file1)
+                    if "DevID" in data:
+                        data["DevID"] = unified_dev_id
                     if "Packets" in data and isinstance(data["Packets"], list):
                             for i, packet in enumerate(data["Packets"]):
                                 data["Packets"][i]["TimeStamp"] = str(int(data["Packets"][i]["TimeStamp"]) + time_offset_file1)
@@ -355,9 +357,9 @@ def main():
     to ensure all valid combinations can be processed without being skipped.
     """
     # --- Configuration ---
-    parent_folder1 = '../../DISCERN/data/legitimate/gpt/0/'
-    parent_folder2 = '../../DISCERN/data/malicious/upload/0/'
-    base_output_folder = '../../DISCERN/data/merged/'
+    parent_folder1 = '../../DISCERN-dev/data/legitimate/gpt/0/'
+    parent_folder2 = '../../DISCERN-dev/data/malicious/upload/0/'
+    base_output_folder = '../../DISCERN-dev/data/merged/'
     time_offset_file1 = 0
 
     # --- Automatic Path and Folder Generation ---

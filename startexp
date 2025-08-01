@@ -272,11 +272,13 @@ else
     fi
 fi
 
-echo "building fusion core..."
-./install/core.sh fusioncore
+if [ "$exfiltrate" = "true" ]; then
+    echo "building fusion core..."
+    ./install/core.sh fusioncore
 
-echo "building sensors..."
-./install/sensors.sh
+    echo "building sensors..."
+    ./install/sensors.sh
+fi
 
 if [ $run -eq 1 ] ; then
     # Make sure we don't fill the databases with data we don't care / need

@@ -1,6 +1,7 @@
+
 #!/bin/bash
 
-host="sstingle@discern.isi.edu"
+host=$1
 
 scp -r "$host:/var/log/discern/json-data/" .
 

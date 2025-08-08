@@ -28,8 +28,8 @@ execute() {
 build_experiment() {
     xdc="$1"
     shift
-    echo "executing './startexp -s $@' on $xdc"
-    execute "$xdc" "./startexp -s $@"
+    echo "executing './startexp -x -s $@' on $xdc"
+    execute "$xdc" "./startexp -x -s $@"
 }
 
 exfiltrate_data() {

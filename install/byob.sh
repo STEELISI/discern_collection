@@ -95,7 +95,7 @@ install() {
     pushd .
         cd $byob
         git pull
-        pip install -r ./requirements.txt
+        pip install -r ./requirements.txt || pip install --break-system-packages -r ./requirements.txt
         rm -rf modules/clients/*
     popd
 }
@@ -155,8 +155,8 @@ pushd .
         if [ "${client_file: -3}" = ".py" ]; then
             (
                 ssh $node "sudo apt -y install python3-pip"
-                ssh $node "pip install colorama numpy pycryptodome"
-                ssh $node "sudo pip install colorama numpy pycryptodome"
+                ssh $node "pip install colorama numpy pycryptodome || pip install colorama numpy pycryptodome"
+                ssh $node "sudo pip install colorama numpy pycryptodome || sudo pip install colorama numpy pycryptodome"
 
             ) &
         fi

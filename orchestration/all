@@ -7,6 +7,7 @@ trials=4
 ./orchestration/run    sunsh $trials ../official/data/malicious/upload          upload
 ./orchestration/run    sunsh $trials ../official/data/malicious/packetsniffer   packetsniffer
 ./orchestration/run    sunsh $trials ../official/data/malicious/portscanner     portscanner
+./orchestration/run    sunsh $trials ../official/data/malicious/cryptomining    cryptomining
 
 ./orchestration/run -f sunsh $trials ../official/data/legitimate/gpt            gpt
 

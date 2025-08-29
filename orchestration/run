@@ -97,6 +97,7 @@ restart_sorcerers() {
     for node in $nodes; do
         execute $xdc "ssh $node 'sudo systemctl restart discern-proc'"
         execute $xdc "ssh $node 'sudo systemctl restart discern-file'"
+        execute $xdc "ssh $node 'sudo systemctl restart discern-interfaces'"
     done
 }
 

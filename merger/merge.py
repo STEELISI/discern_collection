@@ -99,7 +99,7 @@ def finetune_cpu_data(all_data, file1_path, file2_path, malicious_start_time, ma
             load2 = item2.get('Load', [])
             
             # Use itertools.zip_longest to pad the shorter list with 0.0
-            summed_load = [x + y for x, y in itertools.zip_longest(load1, load2, fillvalue=0.0)]
+            summed_load = [min(x + y, 100.0) for x, y in itertools.zip_longest(load1, load2, fillvalue=0.0)]
 
             # Construct the new, merged record
             merged_record = {
@@ -407,9 +407,9 @@ def main():
     to ensure all valid combinations can be processed without being skipped.
     """
     # --- Configuration ---
-    parent_folder1 = '../../DISCERN-dev/data/legitimate/synflood/3/'
-    parent_folder2 = '../../DISCERN-dev/data/malicious/crypto/3/'
-    base_output_folder = '../../DISCERN-dev/data/merged/'
+    parent_folder1 = '../../DISCERN_data/synthetic/legitimate/synflood/0/'
+    parent_folder2 = '../../DISCERN_data/synthetic/malicious/cryptominer/0/'
+    base_output_folder = '../../DISCERN_data/synthetic/merged/'
     time_offset_file1 = 0
 
     # --- Automatic Path and Folder Generation ---

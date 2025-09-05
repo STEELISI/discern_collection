@@ -2,19 +2,19 @@
 
 trials=4
 
-./orchestration/run    sunsh $trials ../official/data/malicious/spread          spread
-./orchestration/run    sunsh $trials ../official/data/malicious/upload          upload
-# ./orchestration/run    sunsh $trials ../official/data/malicious/packetsniffer   packetsniffer
-./orchestration/run -f sunsh $trials ../official/data/malicious/crypto          crypto
-./orchestration/run -f sunsh $trials ../official/data/malicious/ransomware      ransomware
-./orchestration/run    sunsh $trials ../official/data/malicious/portscanner     portscanner
-./orchestration/run    sunsh $trials ../official/data/malicious/internetscanner internetscanner
+./orchestration/run    sunsh $trials ../discern_data/data/malicious/spread          spread
+./orchestration/run    sunsh $trials ../discern_data/data/malicious/upload          upload
+# ./orchestration/run    sunsh $trials ../discern_data/data/malicious/packetsniffer   packetsniffer
+./orchestration/run -f sunsh $trials ../discern_data/data/malicious/crypto          crypto
+./orchestration/run -f sunsh $trials ../discern_data/data/malicious/ransomware      ransomware
+./orchestration/run    sunsh $trials ../discern_data/data/malicious/portscanner     portscanner
+./orchestration/run    sunsh $trials ../discern_data/data/malicious/internetscanner internetscanner
 
 
-./orchestration/run    sunsh $trials ../official/data/legitimate/dnsmitm        dnsmitm
-./orchestration/run -f sunsh $trials ../official/data/legitimate/imgnet         imgnet
-./orchestration/run    sunsh $trials ../official/data/legitimate/synflood       synflood
-./orchestration/run -f sunsh $trials ../official/data/legitimate/gpt            gpt
+./orchestration/run    sunsh $trials ../discern_data/data/legitimate/dnsmitm        dnsmitm
+./orchestration/run -f sunsh $trials ../discern_data/data/legitimate/imgnet         imgnet
+./orchestration/run    sunsh $trials ../discern_data/data/legitimate/synflood       synflood
+./orchestration/run -f sunsh $trials ../discern_data/data/legitimate/gpt            gpt
 
-cd ../official && git add * && git commit -m "re-running all the data" && git push
+cd ../discern_data && git add * && git commit -m "re-running all the data" && git push
 

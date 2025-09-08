@@ -1,6 +1,5 @@
 import os
 import json
-# import pandas as pd
 import itertools
 import random
 
@@ -392,195 +391,317 @@ def process_and_combine_data(folder1, folder2, output_folder,s1_start, s2_start,
         print("-" * (25 + len(filename)))
 
 
-# --- Configuration ---
-# source_folder1 = '../../DISCERN/data/legitimate/dnsmitm/0/cache-data'
-# source_folder2 = '../../DISCERN/data/malicious/upload/0/victim2-data'
-# output_folder_path = './../../DISCERN/data/merged/dnsmitm_upload/0/cache_victim2/'
-# time_offset_file1 = 0
-# time_offset_file2 = 0
-
-# # --- Execution ---
-# process_and_combine_data(source_folder1, source_folder2, output_folder_path)
-def main():
-    """
-    Main execution function that finds the tightest possible processing scenario
-    to ensure all valid combinations can be processed without being skipped.
-    """
-    # --- Configuration ---
-    parent_folder1 = '../../DISCERN_data/synthetic/legitimate/synflood/0/'
-    parent_folder2 = '../../DISCERN_data/synthetic/malicious/cryptominer/0/'
-    base_output_folder = '../../DISCERN_data/synthetic/merged/'
-    time_offset_file1 = 0
-
-    # --- Automatic Path and Folder Generation ---
-    try:
-        name1 = os.path.basename(os.path.dirname(os.path.abspath(parent_folder1)))
-        name2 = os.path.basename(os.path.dirname(os.path.abspath(parent_folder2)))
-        common_dir = os.path.basename(os.path.abspath(parent_folder1))
-    except Exception as e:
-        print(f"Could not automatically determine names from paths. Error: {e}")
-        name1, name2, common_dir = "group1", "group2", ""
-
-    specific_output_base = os.path.join(base_output_folder, f"{name1}_{name2}", common_dir)
-
-    try:
-        subfolders1 = [d for d in os.listdir(parent_folder1) if os.path.isdir(os.path.join(parent_folder1, d)) and d != "summary"]
-        subfolders2 = [d for d in os.listdir(parent_folder2) if os.path.isdir(os.path.join(parent_folder2, d)) and d != "summary"]
-    except FileNotFoundError as e:
-        print(f"Error: Could not find one of the parent directories. {e}")
-        return
-
-    if not subfolders1 or not subfolders2:
-        print("Warning: One or both parent directories are empty or do not exist.")
-        return
-
-    # --- Pre-processing: Find the tightest-case scenario ---
-    print("--- Pre-processing: Finding the tightest scenario (shortest S1, longest S2) ---")
-    
-    # 1. Find the SHORTEST timespan across ALL source 1 files
-    min_s1_span = float('inf')
-    for subfolder in subfolders1:
-        s1_proc_file_path = os.path.join(parent_folder1, subfolder, "proc-cpu-data.txt")
-        timespan_info = get_timespan_from_file(s1_proc_file_path)
-        if timespan_info and timespan_info[2] < min_s1_span:
-            min_s1_span = timespan_info[2]
-
-    # 2. Find the LONGEST timespan across ALL source 2 files
-    max_s2_span = 0
-    for subfolder in subfolders2:
-        s2_proc_file_path = os.path.join(parent_folder2, subfolder, "proc-cpu-data.txt")
-        timespan_info = get_timespan_from_file(s2_proc_file_path)
-        if timespan_info and timespan_info[2] > max_s2_span:
-            max_s2_span = timespan_info[2]
-
-    if min_s1_span == float('inf') or max_s2_span == 0:
-        print("[FATAL] Could not determine baseline timespans. Exiting.")
-        return
-
-    # 3. Check if the tightest case is even possible
-    if min_s1_span < max_s2_span:
-        print(f"[FATAL] The shortest legitimate file (span {min_s1_span}) cannot fit the longest malicious file (span {max_s2_span}). Cannot guarantee all combinations are possible.")
-        return
-        
-    print(f"Shortest S1 Span: {min_s1_span}, Longest S2 Span: {max_s2_span}\n")
-
-    # Generate a single random proportion based on this tightest-case
-    random_proportion = random.uniform(0.0, 1.0)
-    print(f"Using a single random proportion for all combinations: {random_proportion:.4f}\n")
-
-    folder_permutations = list(itertools.product(subfolders1, subfolders2))
-    print(f"Generated {len(folder_permutations)} total combinations to process.\n")
-
-    
-    max_offset = min_s1_span - max_s2_span
-        
-    if max_offset < 1:
-        # This case happens if s1_span == s2_span, no room for an offset
-        time_offset_file2 = 0 # No offset possible, just align starts
-    else:
-        # Apply the single random proportion to the current pair's available gap.
-        # This guarantees a valid, scaled offset without skipping.
-        time_offset_file2 = int(max_offset * random_proportion)
-        time_offset_file2 = max(1, time_offset_file2)
-        
-        
-    # --- Execution Loop ---
-    absolute_s1 = 0
-    for i, (subfolder1, subfolder2) in enumerate(folder_permutations):
-        
-        
-        if i ==0:
-            # first time running, generation of random start time
-            print(f"===== Starting Combination {i+1}/{len(folder_permutations)}: {subfolder1} + {subfolder2} =====")
-            
-            source_path1 = os.path.join(parent_folder1, subfolder1)
-            source_path2 = os.path.join(parent_folder2, subfolder2)
-            
-            rep_file = "proc-cpu-data.txt"
-            timespan_info1 = get_timespan_from_file(os.path.join(source_path1, rep_file))
-            timespan_info2 = get_timespan_from_file(os.path.join(source_path2, rep_file))
-
-            if not timespan_info1 or not timespan_info2:
-                print(f"  [STOP] Could not determine timespan for this pair. Skipping.")
-                continue
-
-            s1_start, _, s1_span = timespan_info1
-            s2_start, _, s2_span = timespan_info2
-
-            # DETECTOR: The only reason to skip is if this S2 fundamentally cannot fit in this S1
-            if s1_span < s2_span:
-                print(f"  [STOP] Source 1 span ({s1_span}) is too short for this Source 2 file ({s2_span}). Skipping.")
-                continue
-                
-            # CALCULATION: The available gap is the current S1 span minus the current S2 span.
-            
-            print(f"  Generated scaled random offset for Source 2: {time_offset_file2}")
-            output_path = os.path.join(specific_output_base, f"{subfolder1[:-5]}_{subfolder2[:-5]}")
-            absolute_s1 = s1_start+time_offset_file2
-            
-            malicious_start_time = s1_start + time_offset_file2
-            malicious_end_time = s1_start + time_offset_file2 + s2_span
-            process_and_combine_data(source_path1, source_path2, output_path, s1_start, s2_start, time_offset_file1, time_offset_file2, malicious_start_time,malicious_end_time)
-            
-            malicious_time_data = {
-                "malicious_start_time": malicious_start_time,
-                "malicious_end_time": malicious_end_time
-            }
-            
-            malicious_time_filepath = os.path.join(output_path, "malicious_time.txt")
-            with open(malicious_time_filepath, 'w') as f:
-                json.dump(malicious_time_data, f, indent=4)
-            
-            print(f"  Successfully wrote malicious time info to {malicious_time_filepath}")
-            print(f"===== Finished Combination: {subfolder1} + {subfolder2} =====\n")
-            
-            
-        else:
-            # use first round's random malicious start time
-            print(f"===== Starting Combination {i+1}/{len(folder_permutations)}: {subfolder1} + {subfolder2} =====")
-            
-            source_path1 = os.path.join(parent_folder1, subfolder1)
-            source_path2 = os.path.join(parent_folder2, subfolder2)
-            
-            rep_file = "proc-cpu-data.txt"
-            timespan_info1 = get_timespan_from_file(os.path.join(source_path1, rep_file))
-            timespan_info2 = get_timespan_from_file(os.path.join(source_path2, rep_file))
-
-            if not timespan_info1 or not timespan_info2:
-                print(f"  [STOP] Could not determine timespan for this pair. Skipping.")
-                continue
-
-            s1_start, _, s1_span = timespan_info1
-            s2_start, _, s2_span = timespan_info2
-
-            # DETECTOR: The only reason to skip is if this S2 fundamentally cannot fit in this S1
-            if s1_span < s2_span:
-                print(f"  [STOP] Source 1 span ({s1_span}) is too short for this Source 2 file ({s2_span}). Skipping.")
-                continue
-                
-            # CALCULATION: The available gap is the current S1 span minus the current S2 span.
-            time_offset_file2 = absolute_s1 - s1_start
-            print(f"  Calculating time offset for Source 2: {time_offset_file2}")
-            output_path = os.path.join(specific_output_base, f"{subfolder1[:-5]}_{subfolder2[:-5]}")
-
-            malicious_start_time = s1_start + time_offset_file2
-            malicious_end_time = s1_start + time_offset_file2 + s2_span
-
-            process_and_combine_data(source_path1, source_path2, output_path, s1_start, s2_start, time_offset_file1, time_offset_file2,malicious_start_time, malicious_end_time)
-            
-
-            
-            malicious_time_data = {
-                "malicious_start_time": malicious_start_time,
-                "malicious_end_time": malicious_end_time
-            }
-            
-            malicious_time_filepath = os.path.join(output_path, "malicious_time.txt")
-            with open(malicious_time_filepath, 'w') as f:
-                json.dump(malicious_time_data, f, indent=4)
-            
-            print(f"  Successfully wrote malicious time info to {malicious_time_filepath}")
-            print(f"===== Finished Combination: {subfolder1} + {subfolder2} =====\n")
-            
+# This block runs when the script is executed
 if __name__ == "__main__":
-    main()
+    
+    # --- 1. DEFINE YOUR LISTS OF FOLDERS HERE ---
+    parent1_list = [
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/0/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/0/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/0/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/0/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/0/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/0/',
+        '../../DISCERN_data/synthetic/legitimate/llm/0/',
+        '../../DISCERN_data/synthetic/legitimate/llm/0/',
+        '../../DISCERN_data/synthetic/legitimate/llm/0/',
+        '../../DISCERN_data/synthetic/legitimate/llm/0/',
+        '../../DISCERN_data/synthetic/legitimate/llm/0/',
+        '../../DISCERN_data/synthetic/legitimate/llm/0/',
+        '../../DISCERN_data/synthetic/legitimate/svm/0/',
+        '../../DISCERN_data/synthetic/legitimate/svm/0/',
+        '../../DISCERN_data/synthetic/legitimate/svm/0/',
+        '../../DISCERN_data/synthetic/legitimate/svm/0/',
+        '../../DISCERN_data/synthetic/legitimate/svm/0/',
+        '../../DISCERN_data/synthetic/legitimate/svm/0/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/0/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/0/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/0/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/0/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/0/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/0/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/1/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/1/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/1/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/1/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/1/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/1/',
+        '../../DISCERN_data/synthetic/legitimate/llm/1/',
+        '../../DISCERN_data/synthetic/legitimate/llm/1/',
+        '../../DISCERN_data/synthetic/legitimate/llm/1/',
+        '../../DISCERN_data/synthetic/legitimate/llm/1/',
+        '../../DISCERN_data/synthetic/legitimate/llm/1/',
+        '../../DISCERN_data/synthetic/legitimate/llm/1/',
+        '../../DISCERN_data/synthetic/legitimate/svm/1/',
+        '../../DISCERN_data/synthetic/legitimate/svm/1/',
+        '../../DISCERN_data/synthetic/legitimate/svm/1/',
+        '../../DISCERN_data/synthetic/legitimate/svm/1/',
+        '../../DISCERN_data/synthetic/legitimate/svm/1/',
+        '../../DISCERN_data/synthetic/legitimate/svm/1/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/1/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/1/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/1/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/1/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/1/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/1/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/2/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/2/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/2/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/2/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/2/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/2/',
+        '../../DISCERN_data/synthetic/legitimate/llm/2/',
+        '../../DISCERN_data/synthetic/legitimate/llm/2/',
+        '../../DISCERN_data/synthetic/legitimate/llm/2/',
+        '../../DISCERN_data/synthetic/legitimate/llm/2/',
+        '../../DISCERN_data/synthetic/legitimate/llm/2/',
+        '../../DISCERN_data/synthetic/legitimate/llm/2/',
+        '../../DISCERN_data/synthetic/legitimate/svm/2/',
+        '../../DISCERN_data/synthetic/legitimate/svm/2/',
+        '../../DISCERN_data/synthetic/legitimate/svm/2/',
+        '../../DISCERN_data/synthetic/legitimate/svm/2/',
+        '../../DISCERN_data/synthetic/legitimate/svm/2/',
+        '../../DISCERN_data/synthetic/legitimate/svm/2/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/2/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/2/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/2/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/2/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/2/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/2/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/3/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/3/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/3/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/3/',
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/3/',
+        '../../DISCERN_data/synthetic/legitimate/llm/3/',
+        '../../DISCERN_data/synthetic/legitimate/llm/3/',
+        '../../DISCERN_data/synthetic/legitimate/llm/3/',
+        '../../DISCERN_data/synthetic/legitimate/llm/3/',
+        '../../DISCERN_data/synthetic/legitimate/llm/3/',
+        '../../DISCERN_data/synthetic/legitimate/svm/3/',
+        '../../DISCERN_data/synthetic/legitimate/svm/3/',
+        '../../DISCERN_data/synthetic/legitimate/svm/3/',
+        '../../DISCERN_data/synthetic/legitimate/svm/3/',
+        '../../DISCERN_data/synthetic/legitimate/svm/3/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/3/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/3/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/3/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/3/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/3/',
+        # Add more legitimate parent folders here
+    ]
+    
+    parent2_list = [
+        '../../DISCERN_data/synthetic/malicious/cryptominer/0/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/0/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/0/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/0/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/0/',
+        '../../DISCERN_data/synthetic/malicious/spread/0/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/0/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/0/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/0/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/0/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/0/',
+        '../../DISCERN_data/synthetic/malicious/spread/0/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/0/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/0/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/0/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/0/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/0/',
+        '../../DISCERN_data/synthetic/malicious/spread/0/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/0/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/0/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/0/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/0/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/0/',
+        '../../DISCERN_data/synthetic/malicious/spread/0/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/0/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/0/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/0/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/0/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/0/',
+        '../../DISCERN_data/synthetic/malicious/spread/0/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/1/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/1/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/1/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/1/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/1/',
+        '../../DISCERN_data/synthetic/malicious/spread/1/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/1/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/1/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/1/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/1/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/1/',
+        '../../DISCERN_data/synthetic/malicious/spread/1/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/1/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/1/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/1/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/1/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/1/',
+        '../../DISCERN_data/synthetic/malicious/spread/1/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/1/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/1/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/1/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/1/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/1/',
+        '../../DISCERN_data/synthetic/malicious/spread/1/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/1/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/1/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/1/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/1/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/1/',
+        '../../DISCERN_data/synthetic/malicious/spread/1/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/2/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/2/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/2/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/2/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/2/',
+        '../../DISCERN_data/synthetic/malicious/spread/2/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/2/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/2/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/2/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/2/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/2/',
+        '../../DISCERN_data/synthetic/malicious/spread/2/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/2/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/2/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/2/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/2/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/2/',
+        '../../DISCERN_data/synthetic/malicious/spread/2/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/2/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/2/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/2/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/2/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/2/',
+        '../../DISCERN_data/synthetic/malicious/spread/2/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/2/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/2/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/2/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/2/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/2/',
+        '../../DISCERN_data/synthetic/malicious/spread/2/',
+
+        '../../DISCERN_data/synthetic/malicious/cryptominer/3/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/3/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/3/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/3/',
+        '../../DISCERN_data/synthetic/malicious/spread/3/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/3/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/3/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/3/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/3/',
+        '../../DISCERN_data/synthetic/malicious/spread/3/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/3/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/3/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/3/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/3/',
+        '../../DISCERN_data/synthetic/malicious/spread/3/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/3/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/3/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/3/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/3/',
+        '../../DISCERN_data/synthetic/malicious/spread/3/',
+        '../../DISCERN_data/synthetic/malicious/cryptominer/3/',
+        '../../DISCERN_data/synthetic/malicious/exfiltrate/3/',
+        '../../DISCERN_data/synthetic/malicious/portscanner/3/',
+        '../../DISCERN_data/synthetic/malicious/ransomware/3/',
+        '../../DISCERN_data/synthetic/malicious/spread/3/',
+        # Add more malicious parent folders here
+    ]
+
+    base_output_folder = '../../DISCERN_data/synthetic/merged/'
+    
+    # --- 2. THE SCRIPT WILL LOOP THROUGH THE LISTS ---
+    # The zip function pairs the first item of parent1_list with the first of parent2_list, and so on.
+    for parent_folder1, parent_folder2 in zip(parent1_list, parent2_list):
+        print(f"\n\n\n############################################################")
+        print(f"### Starting new batch: {os.path.basename(os.path.normpath(parent_folder1))} + {os.path.basename(os.path.normpath(parent_folder2))} ###")
+        print(f"############################################################\n")
+        
+        # --- The logic from your original main() function is now inside the loop ---
+        time_offset_file1 = 0 
+    
+        try:
+            name1 = os.path.basename(os.path.dirname(os.path.normpath(parent_folder1)))
+            name2 = os.path.basename(os.path.dirname(os.path.normpath(parent_folder2)))
+            common_dir = os.path.basename(os.path.normpath(parent_folder1))
+        except Exception as e:
+            print(f"Could not automatically determine names from paths. Error: {e}")
+            continue # Skip to the next pair in the list
+
+        specific_output_base = os.path.join(base_output_folder, f"{name1}_{name2}", common_dir)
+
+        try:
+            subfolders1 = sorted([d for d in os.listdir(parent_folder1) if os.path.isdir(os.path.join(parent_folder1, d)) and d != "summary"])
+            subfolders2 = sorted([d for d in os.listdir(parent_folder2) if os.path.isdir(os.path.join(parent_folder2, d)) and d != "summary"])
+        except FileNotFoundError as e:
+            print(f"Error: Could not find one of the parent directories. {e}")
+            continue
+
+        if not subfolders1 or not subfolders2:
+            print("Warning: One or both parent directories are empty. Skipping this pair.")
+            continue
+
+        # --- Pre-processing: Find the tightest-case scenario for this pair ---
+        min_s1_span = float('inf')
+        for subfolder in subfolders1:
+            s1_path = os.path.join(parent_folder1, subfolder, "proc-cpu-data.txt")
+            timespan_info = get_timespan_from_file(s1_path)
+            if timespan_info and timespan_info[2] < min_s1_span:
+                min_s1_span = timespan_info[2]
+
+        max_s2_span = 0
+        for subfolder in subfolders2:
+            s2_path = os.path.join(parent_folder2, subfolder, "proc-cpu-data.txt")
+            timespan_info = get_timespan_from_file(s2_path)
+            if timespan_info and timespan_info[2] > max_s2_span:
+                max_s2_span = timespan_info[2]
+
+        if min_s1_span == float('inf') or max_s2_span == 0:
+            print("[FATAL] Could not determine baseline timespans. Skipping this pair.")
+            continue
+
+        if min_s1_span < max_s2_span:
+            print(f"[FATAL] Shortest S1 span ({min_s1_span}) cannot fit longest S2 span ({max_s2_span}). Skipping this pair.")
+            continue
+        
+        random_proportion = random.uniform(0.0, 1.0)
+        folder_permutations = list(itertools.product(subfolders1, subfolders2))
+        print(f"Generated {len(folder_permutations)} combinations for this batch.\n")
+        
+        for i, (subfolder1, subfolder2) in enumerate(folder_permutations):
+            print(f"===== Starting Combination {i+1}/{len(folder_permutations)}: {subfolder1} + {subfolder2} =====")
+            
+            source_path1 = os.path.join(parent_folder1, subfolder1)
+            source_path2 = os.path.join(parent_folder2, subfolder2)
+            
+            timespan_info1 = get_timespan_from_file(os.path.join(source_path1, "proc-cpu-data.txt"))
+            timespan_info2 = get_timespan_from_file(os.path.join(source_path2, "proc-cpu-data.txt"))
+
+            if not timespan_info1 or not timespan_info2:
+                print(f"  [STOP] Could not determine timespan for this pair. Skipping.")
+                continue
+
+            s1_start, _, s1_span = timespan_info1
+            s2_start, _, s2_span = timespan_info2
+
+            if s1_span < s2_span:
+                print(f"  [STOP] S1 span ({s1_span}) is too short for this S2 file ({s2_span}). Skipping.")
+                continue
+                
+            available_gap = s1_span - s2_span
+            time_offset_file2 = int(available_gap * random_proportion)
+
+            output_path = os.path.join(specific_output_base, f"{subfolder1.replace('-data', '')}_{subfolder2.replace('-data', '')}")
+            malicious_start_time = s1_start + time_offset_file2
+            malicious_end_time = malicious_start_time + s2_span
+
+            process_and_combine_data(source_path1, source_path2, output_path, s1_start, s2_start, time_offset_file1, time_offset_file2, malicious_start_time, malicious_end_time)
+            
+            malicious_time_data = {"malicious_start_time": malicious_start_time, "malicious_end_time": malicious_end_time}
+            with open(os.path.join(output_path, "malicious_time.txt"), 'w') as f:
+                json.dump(malicious_time_data, f, indent=4)
+            
+            print(f"===== Finished Combination: {subfolder1} + {subfolder2} =====\n")

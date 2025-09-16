@@ -420,6 +420,7 @@ if __name__ == "__main__":
         '../../DISCERN_data/synthetic/legitimate/synflood/0/',
         '../../DISCERN_data/synthetic/legitimate/synflood/0/',
         '../../DISCERN_data/synthetic/legitimate/synflood/0/',
+        
         '../../DISCERN_data/synthetic/legitimate/dnsmitm/1/',
         '../../DISCERN_data/synthetic/legitimate/dnsmitm/1/',
         '../../DISCERN_data/synthetic/legitimate/dnsmitm/1/',
@@ -444,6 +445,7 @@ if __name__ == "__main__":
         '../../DISCERN_data/synthetic/legitimate/synflood/1/',
         '../../DISCERN_data/synthetic/legitimate/synflood/1/',
         '../../DISCERN_data/synthetic/legitimate/synflood/1/',
+        
         '../../DISCERN_data/synthetic/legitimate/dnsmitm/2/',
         '../../DISCERN_data/synthetic/legitimate/dnsmitm/2/',
         '../../DISCERN_data/synthetic/legitimate/dnsmitm/2/',
@@ -468,6 +470,8 @@ if __name__ == "__main__":
         '../../DISCERN_data/synthetic/legitimate/synflood/2/',
         '../../DISCERN_data/synthetic/legitimate/synflood/2/',
         '../../DISCERN_data/synthetic/legitimate/synflood/2/',
+        
+        '../../DISCERN_data/synthetic/legitimate/dnsmitm/3/',
         '../../DISCERN_data/synthetic/legitimate/dnsmitm/3/',
         '../../DISCERN_data/synthetic/legitimate/dnsmitm/3/',
         '../../DISCERN_data/synthetic/legitimate/dnsmitm/3/',
@@ -478,11 +482,14 @@ if __name__ == "__main__":
         '../../DISCERN_data/synthetic/legitimate/llm/3/',
         '../../DISCERN_data/synthetic/legitimate/llm/3/',
         '../../DISCERN_data/synthetic/legitimate/llm/3/',
+        '../../DISCERN_data/synthetic/legitimate/llm/3/',
         '../../DISCERN_data/synthetic/legitimate/svm/3/',
         '../../DISCERN_data/synthetic/legitimate/svm/3/',
         '../../DISCERN_data/synthetic/legitimate/svm/3/',
         '../../DISCERN_data/synthetic/legitimate/svm/3/',
         '../../DISCERN_data/synthetic/legitimate/svm/3/',
+        '../../DISCERN_data/synthetic/legitimate/svm/3/',
+        '../../DISCERN_data/synthetic/legitimate/synflood/3/',
         '../../DISCERN_data/synthetic/legitimate/synflood/3/',
         '../../DISCERN_data/synthetic/legitimate/synflood/3/',
         '../../DISCERN_data/synthetic/legitimate/synflood/3/',
@@ -516,12 +523,7 @@ if __name__ == "__main__":
         '../../DISCERN_data/synthetic/malicious/portscanner/0/',
         '../../DISCERN_data/synthetic/malicious/ransomware/0/',
         '../../DISCERN_data/synthetic/malicious/spread/0/',
-        '../../DISCERN_data/synthetic/malicious/cryptominer/0/',
-        '../../DISCERN_data/synthetic/malicious/exfiltrate/0/',
-        '../../DISCERN_data/synthetic/malicious/internetscanner/0/',
-        '../../DISCERN_data/synthetic/malicious/portscanner/0/',
-        '../../DISCERN_data/synthetic/malicious/ransomware/0/',
-        '../../DISCERN_data/synthetic/malicious/spread/0/',
+        
         '../../DISCERN_data/synthetic/malicious/cryptominer/1/',
         '../../DISCERN_data/synthetic/malicious/exfiltrate/1/',
         '../../DISCERN_data/synthetic/malicious/internetscanner/1/',
@@ -546,18 +548,7 @@ if __name__ == "__main__":
         '../../DISCERN_data/synthetic/malicious/portscanner/1/',
         '../../DISCERN_data/synthetic/malicious/ransomware/1/',
         '../../DISCERN_data/synthetic/malicious/spread/1/',
-        '../../DISCERN_data/synthetic/malicious/cryptominer/1/',
-        '../../DISCERN_data/synthetic/malicious/exfiltrate/1/',
-        '../../DISCERN_data/synthetic/malicious/internetscanner/1/',
-        '../../DISCERN_data/synthetic/malicious/portscanner/1/',
-        '../../DISCERN_data/synthetic/malicious/ransomware/1/',
-        '../../DISCERN_data/synthetic/malicious/spread/1/',
-        '../../DISCERN_data/synthetic/malicious/cryptominer/2/',
-        '../../DISCERN_data/synthetic/malicious/exfiltrate/2/',
-        '../../DISCERN_data/synthetic/malicious/internetscanner/2/',
-        '../../DISCERN_data/synthetic/malicious/portscanner/2/',
-        '../../DISCERN_data/synthetic/malicious/ransomware/2/',
-        '../../DISCERN_data/synthetic/malicious/spread/2/',
+
         '../../DISCERN_data/synthetic/malicious/cryptominer/2/',
         '../../DISCERN_data/synthetic/malicious/exfiltrate/2/',
         '../../DISCERN_data/synthetic/malicious/internetscanner/2/',
@@ -585,29 +576,29 @@ if __name__ == "__main__":
 
         '../../DISCERN_data/synthetic/malicious/cryptominer/3/',
         '../../DISCERN_data/synthetic/malicious/exfiltrate/3/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/3/',
         '../../DISCERN_data/synthetic/malicious/portscanner/3/',
         '../../DISCERN_data/synthetic/malicious/ransomware/3/',
         '../../DISCERN_data/synthetic/malicious/spread/3/',
         '../../DISCERN_data/synthetic/malicious/cryptominer/3/',
         '../../DISCERN_data/synthetic/malicious/exfiltrate/3/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/3/',
         '../../DISCERN_data/synthetic/malicious/portscanner/3/',
         '../../DISCERN_data/synthetic/malicious/ransomware/3/',
         '../../DISCERN_data/synthetic/malicious/spread/3/',
         '../../DISCERN_data/synthetic/malicious/cryptominer/3/',
         '../../DISCERN_data/synthetic/malicious/exfiltrate/3/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/3/',
         '../../DISCERN_data/synthetic/malicious/portscanner/3/',
         '../../DISCERN_data/synthetic/malicious/ransomware/3/',
         '../../DISCERN_data/synthetic/malicious/spread/3/',
         '../../DISCERN_data/synthetic/malicious/cryptominer/3/',
         '../../DISCERN_data/synthetic/malicious/exfiltrate/3/',
+        '../../DISCERN_data/synthetic/malicious/internetscanner/3/',
         '../../DISCERN_data/synthetic/malicious/portscanner/3/',
         '../../DISCERN_data/synthetic/malicious/ransomware/3/',
         '../../DISCERN_data/synthetic/malicious/spread/3/',
-        '../../DISCERN_data/synthetic/malicious/cryptominer/3/',
-        '../../DISCERN_data/synthetic/malicious/exfiltrate/3/',
-        '../../DISCERN_data/synthetic/malicious/portscanner/3/',
-        '../../DISCERN_data/synthetic/malicious/ransomware/3/',
-        '../../DISCERN_data/synthetic/malicious/spread/3/',
+
         # Add more malicious parent folders here
     ]
 
@@ -618,6 +609,7 @@ if __name__ == "__main__":
     for parent_folder1, parent_folder2 in zip(parent1_list, parent2_list):
         print(f"\n\n\n############################################################")
         print(f"### Starting new batch: {os.path.basename(os.path.normpath(parent_folder1))} + {os.path.basename(os.path.normpath(parent_folder2))} ###")
+        print(f"### Starting new batch: {parent_folder1} + {parent_folder2} ###")
         print(f"############################################################\n")
         
         # --- The logic from your original main() function is now inside the loop ---

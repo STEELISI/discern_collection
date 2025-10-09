@@ -2,6 +2,8 @@ import os
 import json
 import itertools
 import random
+import subprocess
+import sys
 
 def generate_unified_dev_id(file1_path, file2_path, default_id="unified.dev.id"):
     """
@@ -104,7 +106,8 @@ def finetune_cpu_data(all_data, file1_path, file2_path, malicious_start_time, ma
             merged_record = {
                 'TimeStamp': avg_timestamp,
                 'Load': summed_load,
-                'DevID': unified_dev_id
+                'DevID': unified_dev_id,
+                'malicious': item1.get('malicious', 0) or item2.get('malicious', 0)
             }
             processed_during_data.append(merged_record)
 
@@ -216,6 +219,7 @@ def process_network_data(file1_path, file2_path,s1_start,s2_start,time_offset_fi
                  try:
                     data = json.loads(line)
                     data["TimeStamp"] = str(int(data["TimeStamp"]) + time_offset_file1)
+                    data["malicious"] = 0
                     if "DevID" in data:
                         data["DevID"] = unified_dev_id
                     if "Packets" in data and isinstance(data["Packets"], list):
@@ -236,6 +240,7 @@ def process_network_data(file1_path, file2_path,s1_start,s2_start,time_offset_fi
                     data = json.loads(line)
                     
                     data["TimeStamp"] = str(int(data["TimeStamp"]) - s2_start + s1_start + time_offset_file2)
+                    data["malicious"] = 1
                     
                     if "Packets" in data and isinstance(data["Packets"], list):
                         for i, packet in enumerate(data["Packets"]):
@@ -264,6 +269,7 @@ def process_file_data(file1_path,file2_path,s1_start,s2_start, time_offset_file1
                     
                     
                     data["TimeStamp"] = str(int(data["TimeStamp"]) + time_offset_file1)
+                    data["malicious"] = 0
                     
                     if "DevID" in data:
                         data["DevID"] = unified_dev_id
@@ -298,6 +304,7 @@ def process_file_data(file1_path,file2_path,s1_start,s2_start, time_offset_file1
                         data["TimeStamp"] = str(min_timestamp +time_offset_file1)
                     else:
                         data["TimeStamp"] = str(int(data["TimeStamp"]) - s2_start + s1_start + time_offset_file2)
+                        data["malicious"] = 1
                         if "DevID" in data:
                             data["DevID"] = unified_dev_id
                         all_data.append(data)
@@ -307,6 +314,51 @@ def process_file_data(file1_path,file2_path,s1_start,s2_start, time_offset_file1
         print(f"Warning: File not found, skipping: {file2_path}")
         
     return all_data
+
+def run_csv_converter(input_file_path):
+    """
+    Dynamically finds and runs the correct CSV converter script for the given input file.
+    """
+    filename = os.path.basename(input_file_path)
+    # e.g., "cpu-load-data.txt" -> "cpu-load"
+    data_type = filename.replace("-data.txt", "")
+    
+    # This script is in merger/, converters are in analyze/convert-to-csv/
+    script_dir = os.path.dirname(__file__)
+    script_path = os.path.join(script_dir, '..', 'analyze', 'convert-to-csv', f"csv-{data_type}.py")
+
+    if not os.path.exists(script_path):
+        print(f"  > CSV converter not found for {data_type} at {script_path}. Skipping CSV generation.")
+        return
+
+    # e.g. "output/cpu-load-data.txt" -> "output/cpu-load-res.csv"
+    output_csv_path = os.path.join(
+        os.path.dirname(input_file_path),
+        f"{data_type}-res.csv"
+    )
+
+    command = [
+        sys.executable,
+        script_path,
+        input_file_path,
+        "-o",
+        output_csv_path
+    ]
+    
+    print(f"  > Running CSV converter for {filename}...")
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        print(f"  > Successfully created {os.path.basename(output_csv_path)}")
+        if result.stdout:
+            # Print converter output, indented for clarity
+            for line in result.stdout.strip().split('\\n'):
+                print(f"    {line}")
+    except subprocess.CalledProcessError as e:
+        print(f"  > Error running CSV converter for {filename}:")
+        print(f"    Command: {' '.join(command)}")
+        print(f"    Exit Code: {e.returncode}")
+        print(f"    Stderr: {e.stderr.strip()}")
+        print(f"    Stdout: {e.stdout.strip()}")
 
 def process_and_combine_data(folder1, folder2, output_folder,s1_start, s2_start, time_offset_file1, time_offset_file2,malicious_start_time,malicious_end_time):
     """
@@ -347,6 +399,7 @@ def process_and_combine_data(folder1, folder2, output_folder,s1_start, s2_start,
                             data = json.loads(line)
                             
                             data["TimeStamp"] = str(int(data["TimeStamp"]) + time_offset_file1)
+                            data["malicious"] = 0
                             if "DevID" in data:
                                 data["DevID"] = unified_dev_id
                             all_data.append(data)
@@ -363,6 +416,7 @@ def process_and_combine_data(folder1, folder2, output_folder,s1_start, s2_start,
                         try:
                             data = json.loads(line)
                             data["TimeStamp"] = str(int(data["TimeStamp"]) - s2_start + s1_start + time_offset_file2)
+                            data["malicious"] = 1
                             if "DevID" in data:
                                 data["DevID"] = unified_dev_id
                             all_data.append(data)
@@ -388,6 +442,7 @@ def process_and_combine_data(folder1, folder2, output_folder,s1_start, s2_start,
                 f.write(json.dumps(data) + '\n')
 
         print(f"Successfully processed and combined '{filename}'")
+        run_csv_converter(output_file_path)
         print("-" * (25 + len(filename)))
 
 

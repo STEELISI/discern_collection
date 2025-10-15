@@ -64,8 +64,10 @@ That should be everything you need to know! The rest of this document is technic
 software included in this repo, in case you'd only like to use parts of it
 
 **If you take repeated trials and want the most accurate process data, restart 
-`discern-proc.service` before each trial. The Process Sorcerer ignores all process running when it 
-boots and only collects data on the ones started after it boots. This will change between trials**
+`discern-proc.service`, `discern-file.service`, and `discern-interfaces.service` before each trial. 
+The Process Sorcerer ignores all process running when it boots and only collects data on the ones 
+started after it boots. This will change between trials. The File Sorcerer needs to initialize
+the file system for each trial. This data is saved in  `/var/log/discern/hash-database.txt`**
 
 
 ### Orchestration

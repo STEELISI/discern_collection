@@ -95,6 +95,8 @@ restart_sorcerers() {
     nodes=$(execute "$xdc" ./util/list-nodes.sh)
 
     for node in $nodes; do
+        # Remove this so the hash database is calculated every time
+        execute $xdc "ssh $node 'sudo rm -f /var/log/discern/hash-database.txt'"
         execute $xdc "ssh $node 'sudo systemctl restart discern-proc'"
         execute $xdc "ssh $node 'sudo systemctl restart discern-file'"
         execute $xdc "ssh $node 'sudo systemctl restart discern-interfaces'"

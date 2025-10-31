@@ -2,7 +2,7 @@
 
 set -e
 
-version="8.0.0"
+version="8.0.1"
 
 show_help() {
     echo "Usage: ./install-sensors-xdc.sh [flags] [optional: nodes]"
@@ -28,7 +28,7 @@ if [ "$nodes" = "" ]; then
 fi
 
 # Copy the deb from the package registry
-curl "https://gitlab.com/api/v4/projects/53927750/packages/generic/Debian/$version/LocalDebianDiscern.deb" --output $HOME/Sorcerers.deb
+curl "https://gitlab.com/api/v4/projects/53927750/packages/generic/Debian/$version/Bullseye-Local-Discern-Sorcerers.deb" --output $HOME/Sorcerers.deb
 
 for node in $nodes; do
     if [ "$node" = "ifr0" ]  || [ "$node" = "ifr1" ] || [ "$node" = "fusioncore" ]; then

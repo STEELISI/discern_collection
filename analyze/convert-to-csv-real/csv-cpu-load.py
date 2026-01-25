@@ -6,7 +6,7 @@ from pathlib import Path
 def process_cpu_load_splitter(input_file_path):
     """
     Single-pass Router Script.
-    Reads JSON stream line-by-line and immediately appends to the correct CSV.
+    Reads JSON stream line-by-line and immediately appends to the correct CSV based on DevID.
     
     Path Structure: ./[suffix_path]/[prefix]-data/cpu-load.csv
     Example: client.a.b.c.d -> ./a_b_c_d/client-data/cpu-load.csv

@@ -9,6 +9,7 @@ def process_interfaces_splitter(input_file_path):
     based on the DevID structure.
     
     Path Structure: ./[suffix_path]/[prefix]-data/interfaces.csv
+    Example: client.a.b.c.d -> ./a_b_c_d/client-data/interfaces.csv
     """
     
     # Track initialized files to avoid redundant disk checks

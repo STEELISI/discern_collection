@@ -6,13 +6,24 @@
 #include <sstream>
 #include <set>
 #include <unordered_map>
-#include "json.hpp" 
+#include "json.hpp" // https://github.com/nlohmann/json
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
+/* 
+
+This program reads JSON interface data and splits it into multiple CSV files 
+based on the DevID structure.
+This program require the json hpp file to compile: https://github.com/nlohmann/json
+
+Path Structure: ./[suffix_path]/[prefix]-data/proc-mem.csv
+Example: client.a.b.c.d -> ./a_b_c_d/client-data/proc-mem.csv
+
+*/
+
 // --- CONFIGURATION ---
-const int BATCH_SIZE = 20000; 
+const int BATCH_SIZE = 50000; 
 
 // --- Helper: Safely extract values ---
 std::string get_val(const json& j, const std::string& key, const std::string& default_val = "N/A") {

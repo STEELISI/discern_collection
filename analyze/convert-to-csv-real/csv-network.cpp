@@ -6,13 +6,26 @@
 #include <sstream>
 #include <set>
 #include <unordered_map>
-#include "json.hpp" 
+#include "json.hpp" // https://github.com/nlohmann/json
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
+
+/* 
+
+This program reads JSON interface data and splits it into multiple CSV files 
+based on the DevID structure.
+This program require the json hpp file to compile: https://github.com/nlohmann/json
+
+Path Structure: ./[suffix_path]/[prefix]-data/network.csv
+Example: client.a.b.c.d -> ./a_b_c_d/client-data/network.csv
+
+*/
+
+
 // --- CONFIGURATION ---
-const int BATCH_SIZE = 10000; // Buffer 5000 packets in RAM before writing to disk
+const int BATCH_SIZE = 50000; // Buffer 50000 packets in RAM before writing to disk
 
 // --- Helper: Safely extract values ---
 std::string get_val(const json& j, const std::string& key, const std::string& default_val = "N/A") {

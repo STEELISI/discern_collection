@@ -2,124 +2,127 @@ import json
 import csv
 import argparse
 from pathlib import Path
+from collections import defaultdict
 
-def process_file_data_splitter(input_file_path):
-    """
-    Reads JSON file change data and splits it into multiple CSV files 
-    based on the DevID structure.
-    
-    Path Structure: ./[suffix_path]/[prefix]-data/file.csv
-    """
-    
-    # Track initialized files to avoid redundant disk checks
-    initialized_paths = set()
+"""
+Reads JSON stream in small batches and immediately appends to the correct CSV based on DevID.
 
-    # Fixed header for File Change data
-    header = [
-        'timestamp', 'device_id', 'location', 'size', 
-        'hash', 'owner', 'group'
-    ]
+Path Structure: ./[suffix_path]/[prefix]-data/file.csv
+Example: client.a.b.c.d -> ./a_b_c_d/client-data/file.csv
+"""
+
+
+# How many lines to process in RAM before writing to disk
+BATCH_SIZE = 5000
+
+def get_val_robust(data, key, default='N/A'):
+    """
+    Safely extracts a value whether it is a single item or a list.
+    """
+    val = data.get(key)
+    if val is None:
+        return default
+    
+    # If it turns out to be a list, grab the first item
+    if isinstance(val, list):
+        return val[0] if len(val) > 0 else default
+    
+    return val
+
+def flush_buffer(buffer, initialized_files):
+    """
+    Writes all buffered rows to their respective CSV files.
+    """
+    for file_path_str, rows in buffer.items():
+        if not rows:
+            continue
+            
+        output_path = Path(file_path_str)
+        
+        # Ensure directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Header Logic
+        write_header = False
+        if file_path_str not in initialized_files:
+            if not output_path.exists():
+                write_header = True
+            initialized_files.add(file_path_str)
+            
+        # Write Append
+        try:
+            with open(output_path, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                if write_header:
+                    writer.writerow(['timestamp', 'device_id', 'location', 'size', 'hash', 'owner', 'group'])
+                writer.writerows(rows)
+        except IOError as e:
+            print(f"Error writing to {output_path}: {e}")
+
+    # Clear memory
+    buffer.clear()
+
+def process_file_changes(input_file):
+    buffer = defaultdict(list)
+    initialized_files = set()
+    line_count = 0
+
+    print(f"Processing: {input_file}")
 
     try:
-        with open(input_file_path, 'r') as infile:
-            for line in infile:
-                if not line.strip(): 
-                    continue
+        with open(input_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip(): continue
                 
                 try:
                     log_entry = json.loads(line)
-                    if not isinstance(log_entry, dict):
-                        continue
                 except json.JSONDecodeError:
                     continue
 
-                # --- 1. Dynamic Routing (Check DevID) ---
+                # --- 1. Routing Logic ---
                 dev_id = log_entry.get('DevID', 'unknown')
                 parts = dev_id.split('.')
                 
                 if len(parts) >= 2:
-                    # Example: client.bnsdq.ozxfs -> client-data / bnsdq_ozxfs...
                     folder_sub = f"{parts[0]}-data"
                     folder_base = "_".join(parts[1:])
                 else:
                     folder_base = "unknown_device_group"
                     folder_sub = f"{dev_id}-data"
 
-                output_dir = Path(folder_base) / folder_sub
-                # Using 'file.csv' to match your original default
-                output_file = output_dir / "file.csv" 
+                output_file = Path(folder_base) / folder_sub / "file.csv"
                 output_path_str = str(output_file)
 
-                # --- 2. Extract Data Fields (Handling Arrays Safely) ---
-                timestamp = log_entry.get('TimeStamp', 'N/A')
+                # --- 2. Extract Data ---
+                # Using robust extraction to handle your specific data quirks
+                timestamp = log_entry.get('TimeStamp', '0')
+                location = get_val_robust(log_entry, 'Location')
+                size = log_entry.get('Size', 0)
+                file_hash = log_entry.get('Hash', 'N/A')
+                owner = log_entry.get('Owner', 'N/A') # Flat structure per your latest sample
+                group = log_entry.get('Group', 'N/A')
+
+                row = [timestamp, dev_id, location, size, file_hash, owner, group]
                 
-                # Helper to safely get index 0 from a list
-                def get_first(source, key, default='N/A'):
-                    val = source.get(key)
-                    if isinstance(val, list) and len(val) > 0:
-                        return val[0]
-                    return default
+                # --- 3. Buffer ---
+                buffer[output_path_str].append(row)
+                line_count += 1
 
-                location = get_first(log_entry, 'Location', 'N/A')
-                size = get_first(log_entry, 'Size', '0')
-                hash_val = get_first(log_entry, 'Hash', 'N/A')
-                
-                # Ownership is a list of objects: [{"Owner": "root", "Group": "root"}]
-                owner = 'N/A'
-                group = 'N/A'
-                raw_ownership = log_entry.get('Ownership')
-                
-                if isinstance(raw_ownership, list) and len(raw_ownership) > 0:
-                    first_obj = raw_ownership[0]
-                    if isinstance(first_obj, dict):
-                        owner = first_obj.get('Owner', 'N/A')
-                        group = first_obj.get('Group', 'N/A')
+                # Flush every BATCH_SIZE lines
+                if line_count >= BATCH_SIZE:
+                    flush_buffer(buffer, initialized_files)
+                    line_count = 0
 
-                row = [
-                    timestamp,
-                    dev_id,
-                    location,
-                    size,
-                    hash_val,
-                    owner,
-                    group
-                ]
-
-                # --- 3. Write Data ---
-                output_dir.mkdir(parents=True, exist_ok=True)
-
-                write_header = False
-                
-                # Check if we need to write header (New file on disk OR new in this run)
-                if output_path_str not in initialized_paths:
-                    if not output_file.exists():
-                        write_header = True
-                    initialized_paths.add(output_path_str)
-
-                # Open in Append Mode
-                with open(output_file, 'a', newline='') as outfile:
-                    writer = csv.writer(outfile)
-                    if write_header:
-                        writer.writerow(header)
-                    writer.writerow(row)
+        # --- 4. Final Flush ---
+        flush_buffer(buffer, initialized_files)
+        print("Done.")
 
     except FileNotFoundError:
-        print(f"Error: Input file not found at {input_file_path}")
-    except IOError as e:
-        print(f"File I/O Error: {e}")
-    else:
-        print(f"Processing complete. Data distributed into {len(initialized_paths)} unique CSV files.")
+        print(f"Error: Input file not found: {input_file}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Splits File Change JSON logs into folders based on DevID.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument(
-        "input_file",
-        type=Path,
-        help="Path to the input file with file change data."
-    )
-
+    parser = argparse.ArgumentParser(description="Process File Change JSON logs to CSV.")
+    parser.add_argument("input_file", type=Path, help="Path to input .json/.jsonl file")
     args = parser.parse_args()
-    process_file_data_splitter(args.input_file)
+    
+    process_file_changes(args.input_file)

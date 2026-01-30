@@ -57,6 +57,31 @@ def generate_unified_dev_id(file1_path, file2_path, default_id="unified.dev.id")
         else: new_parts.append(f"{parts1[i]}-{parts2[i]}")
     return ".".join(new_parts)
 
+def convert_NA_0(column_name):
+    """
+    Returns specific defaults based on column name context.
+    - Explicit Request: PPID/UIDs/GIDs -> 0
+    - Metrics -> 0
+    - Others -> N/A
+    """
+    col = column_name.lower()
+    
+    # 1. USER REQUEST: Force these specific fields to "0"
+
+    target_zero_ids = [
+        'ppid', 
+        'real_uid', 'effective_uid', 'saved_uid', 'filesystem_uid', 
+        'real_gid', 'effective_gid', 'saved_gid', 'filesystem_gid'
+    ]
+    if col in target_zero_ids:
+        return "0"
+    
+    if any(x in col for x in ['vm_', 'rss', 'threads', 'cpu', 'load_core', 'length', 'size', 'peak', 'data', 'hwm', 'stk']):
+        return "0"
+
+    # 3. Everything else (pid, name, state, etc.) -> "N/A"
+    return "N/A"
+
 def get_write_headers(file1, file2, filename):
     h1 = get_csv_headers(file1)
     h2 = get_csv_headers(file2)
@@ -145,8 +170,8 @@ def finetune_cpu_csv(all_data, file1, file2, start_time, end_time, fieldnames, u
             merged = {}
             for k in fieldnames:
                 val = item1.get(k)
-                if val is None or str(val).strip() == "":
-                    merged[k] = "N/A"
+                if val is None or str(val).strip() == "" or str(val).strip() == "N/A":
+                    merged[k] = convert_NA_0(k)
                 else:
                     merged[k] = str(val)
 
@@ -188,8 +213,8 @@ def process_csv_pair(file1, file2, output_path, golden_offset, times, filename):
                         val = row.get(k)
                         if "cpu-load" in filename and "load_core" in k:
                             clean[k] = "0.0" if (val is None or str(val).strip() == "" or str(val) == "N/A") else str(val)
-                        elif val is None or str(val).strip() == "":
-                            clean[k] = "N/A"
+                        elif val is None or str(val).strip() == "" or str(val) == "N/A":
+                             clean[k] = convert_NA_0(k)
                         else:
                             clean[k] = str(val)
                     
@@ -246,13 +271,9 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
     # Define Inputs
-    # parent1_list = ['../bnsdq_ozxfs_rzona_uxkia/']
-    # parent1_list = ['../bnsdq_ozxfs_rzona_nmtny/']
-    parent1_list = ['../bnsdq_ozxfs_rzona_lnllj/']
+    parent1_list = ['../bnsdq_ozxfs_rzona_uxkia/', '../bnsdq_ozxfs_rzona_nmtny/', '../bnsdq_ozxfs_rzona_lnllj/']
 
-    # parent2_list = ['../synthetic/cryptominer/0']
-    # parent2_list = ['../synthetic/exfiltrate/1']
-    parent2_list = ['../synthetic/ransomware/2']
+    parent2_list = ['../synthetic/cryptominer/0','../synthetic/exfiltrate/1','../synthetic/ransomware/2']
     
     base_output_folder = os.path.normpath(os.path.join(script_dir, '../merge/'))
     if not os.path.exists(base_output_folder):
